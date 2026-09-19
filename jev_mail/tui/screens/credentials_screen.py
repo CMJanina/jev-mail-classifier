@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Footer, Header, Input, Label, Static
 
 from jev_mail.config import JevSettings, read_env, save_env
 from jev_mail.providers import ProviderError, get_jev_client
@@ -25,31 +25,42 @@ class CredentialsScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         existing = self._existing
-        with VerticalScroll():
-            yield Static("Step 1/3 -- Credentials", classes="title")
-            if existing:
-                yield Static("Already configured -- shown pre-filled below. Edit only what you want to change.", classes="hint")
-            yield Static("Paste ONE Jev key (whichever you have) and your IMAP login.")
-            yield Label("TypeSafe API key")
-            yield Input(value=existing.get("TYPESAFE_API_KEY", ""), placeholder="TYPESAFE_API_KEY", password=True, id="typesafe_key")
-            yield Label("OpenRouter API key")
-            yield Input(value=existing.get("OPENROUTER_API_KEY", ""), placeholder="OPENROUTER_API_KEY", password=True, id="openrouter_key")
-            yield Label("Vercel AI Gateway key")
-            yield Input(value=existing.get("AI_GATEWAY_API_KEY", ""), placeholder="AI_GATEWAY_API_KEY", password=True, id="vercel_key")
-            yield Button("Test key", id="test_key")
-            yield Static("", id="key_test_status")
-            yield Label("IMAP username")
-            yield Input(value=existing.get("IMAP_USERNAME", ""), placeholder="you@example.com", id="imap_username")
-            yield Label("IMAP password (NOT your regular password if 2FA is on -- see below)")
-            yield Input(value=existing.get("IMAP_PASSWORD", ""), placeholder="app password", password=True, id="imap_password")
-            yield Static(
-                "Need an app password? Gmail: myaccount.google.com/apppasswords "
-                "(enable IMAP first in Gmail Settings -> Forwarding and POP/IMAP). "
-                "Outlook: account.microsoft.com/security -> App passwords. "
-                "Full walkthrough: see the README's 'Getting your IMAP username & password' section.",
-                classes="hint",
-            )
-            yield Button("Continue", id="continue", variant="primary")
+        yield Header()
+        with Container(id="panel"):
+            with VerticalScroll():
+                yield Static("✉  Credentials", classes="title")
+                yield Static("Step 1 of 3 -- paste ONE Jev key (whichever you have) and your IMAP login.", classes="subtitle")
+                if existing:
+                    yield Static("Already configured -- shown pre-filled below. Edit only what you want to change.", classes="hint")
+
+                yield Label("TypeSafe API key", classes="field-label")
+                yield Input(value=existing.get("TYPESAFE_API_KEY", ""), placeholder="TYPESAFE_API_KEY", password=True, id="typesafe_key")
+                yield Label("OpenRouter API key", classes="field-label")
+                yield Input(value=existing.get("OPENROUTER_API_KEY", ""), placeholder="OPENROUTER_API_KEY", password=True, id="openrouter_key")
+                yield Label("Vercel AI Gateway key", classes="field-label")
+                yield Input(value=existing.get("AI_GATEWAY_API_KEY", ""), placeholder="AI_GATEWAY_API_KEY", password=True, id="vercel_key")
+
+                with Horizontal(classes="button-row"):
+                    yield Static("", id="key_test_status")
+                    yield Button("Test key", id="test_key")
+
+                yield Label("IMAP username", classes="field-label")
+                yield Input(value=existing.get("IMAP_USERNAME", ""), placeholder="you@example.com", id="imap_username")
+                yield Label("IMAP password (NOT your regular password if 2FA is on -- see below)", classes="field-label")
+                yield Input(value=existing.get("IMAP_PASSWORD", ""), placeholder="app password", password=True, id="imap_password")
+                yield Static(
+                    "Need an app password? Gmail: myaccount.google.com/apppasswords "
+                    "(enable IMAP first in Gmail Settings -> Forwarding and POP/IMAP). "
+                    "Outlook: account.microsoft.com/security -> App passwords. "
+                    "Full walkthrough: see the README's 'Getting your IMAP username & password' section.",
+                    classes="hint",
+                )
+            with Horizontal(classes="actions-dock"):
+                yield Button("Continue", id="continue", variant="primary")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = "Step 1 of 3 · Credentials"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "test_key":

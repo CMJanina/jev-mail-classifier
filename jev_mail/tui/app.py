@@ -10,17 +10,96 @@ from jev_mail.tui.screens.credentials_screen import CredentialsScreen
 from jev_mail.tui.screens.mailbox_screen import MailboxScreen
 
 CSS = """
+Screen {
+    align: center middle;
+    background: $surface;
+}
+
+#panel {
+    width: 96;
+    max-width: 96%;
+    height: 90%;
+    border: round $accent;
+    background: $panel;
+    padding: 1 3;
+}
+
+#panel > VerticalScroll {
+    height: 1fr;
+}
+
 .title {
     text-style: bold;
-    padding: 1 0;
+    color: $accent;
+    padding: 0 0 1 0;
 }
+
+.subtitle {
+    color: $text-muted;
+    padding: 0 0 1 0;
+}
+
 .hint {
     color: $text-muted;
     padding: 1 0;
 }
+
 .error {
-    color: red;
+    color: $error;
+    text-style: bold;
     padding: 1 0;
+}
+
+.field-label {
+    color: $text-muted;
+    padding: 1 0 0 0;
+}
+
+.button-row {
+    height: auto;
+    padding: 1 0 0 0;
+}
+
+.button-row Button {
+    margin-right: 1;
+}
+
+.button-row Static {
+    width: auto;
+    padding: 1 1 0 0;
+}
+
+.actions-dock {
+    dock: bottom;
+    height: auto;
+    padding-top: 1;
+    border-top: solid $accent 30%;
+}
+
+.actions-dock Button {
+    margin-right: 1;
+}
+
+#category_list {
+    border: round $accent 50%;
+    background: $surface;
+    height: auto;
+    max-height: 16;
+    margin: 1 0;
+}
+
+#category_list > ListItem {
+    padding: 0 1;
+}
+
+#category_list > ListItem.--highlight {
+    background: $accent 25%;
+}
+
+#empty_categories {
+    color: $text-muted;
+    text-style: italic;
+    padding: 1;
 }
 """
 
@@ -30,7 +109,7 @@ class JevMailConfigApp(App):
     via the credentials screen, .env). Each step's Continue/Save dismisses
     with the collected data; the app wires results into `self.config`."""
 
-    TITLE = "jev-mail configure"
+    TITLE = "jev-mail"
     CSS = CSS
 
     def __init__(self, config_path: Path, env_path: Path, config: AppConfig | None = None):

@@ -7,3 +7,4 @@ config.yaml
 *.egg-info/
 .claude/
 brag-output/
+.DS_Store

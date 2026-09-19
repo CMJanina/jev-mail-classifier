@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Checkbox, Input, Label, Static
+from textual.widgets import Button, Checkbox, Footer, Header, Input, Label, Static
 
 from jev_mail.config import Action, Category
 
@@ -20,30 +20,36 @@ class CategoryEditScreen(Screen[Category | None]):
         c = self._category
         actions_by_type = {a.type: a for a in (c.actions if c else [])}
 
-        with VerticalScroll():
-            yield Static("Add category" if c is None else f"Edit: {c.name}", classes="title")
-            yield Label("Name (short, no spaces -- also used as the tag keyword)")
-            yield Input(value=c.name if c else "", id="name")
-            yield Label("Description (what Jev should look for)")
-            yield Input(value=c.description if c else "", placeholder="Invoice, billing statement, or payment request", id="description")
-            yield Label("Threshold override 0-1 (blank = use the default)")
-            yield Input(value=str(c.threshold) if c and c.threshold is not None else "", id="threshold")
+        yield Header()
+        with Container(id="panel"):
+            with VerticalScroll():
+                yield Static("Add category" if c is None else f"Edit: {c.name}", classes="title")
+                yield Label("Name (short, no spaces -- also used as the tag keyword)", classes="field-label")
+                yield Input(value=c.name if c else "", id="name")
+                yield Label("Description (what Jev should look for)", classes="field-label")
+                yield Input(value=c.description if c else "", placeholder="Invoice, billing statement, or payment request", id="description")
+                yield Label("Threshold override 0-1 (blank = use the default)", classes="field-label")
+                yield Input(value=str(c.threshold) if c and c.threshold is not None else "", id="threshold")
 
-            yield Static("Actions when matched:")
-            yield Checkbox("Tag", value="tag" in actions_by_type, id="cb_tag")
-            yield Input(value=actions_by_type.get("tag", Action(type="tag")).value or "", placeholder="tag value", id="tag_value")
+                yield Static("Actions when matched", classes="subtitle")
+                yield Checkbox("Tag", value="tag" in actions_by_type, id="cb_tag")
+                yield Input(value=actions_by_type.get("tag", Action(type="tag")).value or "", placeholder="tag value", id="tag_value")
 
-            yield Checkbox("Move to folder", value="move" in actions_by_type, id="cb_move")
-            yield Input(value=actions_by_type.get("move", Action(type="move")).folder or "", placeholder="folder name", id="move_folder")
+                yield Checkbox("Move to folder", value="move" in actions_by_type, id="cb_move")
+                yield Input(value=actions_by_type.get("move", Action(type="move")).folder or "", placeholder="folder name", id="move_folder")
 
-            yield Checkbox("Flag (star)", value="flag" in actions_by_type, id="cb_flag")
-            yield Checkbox("Mark read", value="mark_read" in actions_by_type, id="cb_mark_read")
+                yield Checkbox("Flag (star)", value="flag" in actions_by_type, id="cb_flag")
+                yield Checkbox("Mark read", value="mark_read" in actions_by_type, id="cb_mark_read")
 
-            yield Checkbox("Webhook", value="webhook" in actions_by_type, id="cb_webhook")
-            yield Input(value=actions_by_type.get("webhook", Action(type="webhook")).url or "", placeholder="https://hooks.slack.com/...", id="webhook_url")
+                yield Checkbox("Webhook", value="webhook" in actions_by_type, id="cb_webhook")
+                yield Input(value=actions_by_type.get("webhook", Action(type="webhook")).url or "", placeholder="https://hooks.slack.com/...", id="webhook_url")
+            with Horizontal(classes="actions-dock"):
+                yield Button("Save", id="save", variant="primary")
+                yield Button("Cancel", id="cancel")
+        yield Footer()
 
-            yield Button("Save", id="save", variant="primary")
-            yield Button("Cancel", id="cancel")
+    def on_mount(self) -> None:
+        self.app.sub_title = "Add category" if self._category is None else f"Edit {self._category.name}"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel":

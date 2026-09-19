@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from textual.app import ComposeResult
-from textual.containers import VerticalScroll
+from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Footer, Header, Input, Label, Static
 
 from jev_mail.config import MailboxConfig
 
@@ -17,20 +17,30 @@ class MailboxScreen(Screen[MailboxConfig]):
         self._mailbox = mailbox
 
     def compose(self) -> ComposeResult:
-        with VerticalScroll():
-            yield Static("Step 2/3 -- Mailbox", classes="title")
-            yield Label("IMAP host")
-            yield Input(value=self._mailbox.host, placeholder="imap.gmail.com", id="host")
-            yield Label("Port")
-            yield Input(value=str(self._mailbox.port), id="port")
-            yield Label("Folder to watch")
-            yield Input(value=self._mailbox.folder, id="folder")
-            yield Label("Poll interval in seconds (used by `watch` if the server has no IDLE support)")
-            yield Input(value=str(self._mailbox.poll_interval_seconds), id="poll_interval")
-            yield Label("Max emails to classify per run/poll (caps cost and time on a big backlog)")
-            yield Input(value=str(self._mailbox.max_emails_per_run), id="max_emails_per_run")
-            yield Static("", id="mailbox_error", classes="error")
-            yield Button("Continue", id="continue", variant="primary")
+        yield Header()
+        with Container(id="panel"):
+            with VerticalScroll():
+                yield Static("\U0001f4ec  Mailbox", classes="title")
+                yield Static("Step 2 of 3 -- which inbox and folder should jev-mail watch?", classes="subtitle")
+
+                yield Label("IMAP host", classes="field-label")
+                yield Input(value=self._mailbox.host, placeholder="imap.gmail.com", id="host")
+                yield Label("Port", classes="field-label")
+                yield Input(value=str(self._mailbox.port), id="port")
+                yield Label("Folder to watch", classes="field-label")
+                yield Input(value=self._mailbox.folder, id="folder")
+                yield Label("Poll interval in seconds (used by `watch` if the server has no IDLE support)", classes="field-label")
+                yield Input(value=str(self._mailbox.poll_interval_seconds), id="poll_interval")
+                yield Label("Max emails to classify per run/poll (caps cost and time on a big backlog)", classes="field-label")
+                yield Input(value=str(self._mailbox.max_emails_per_run), id="max_emails_per_run")
+            with Vertical(classes="actions-dock"):
+                yield Static("", id="mailbox_error", classes="error")
+                with Horizontal():
+                    yield Button("Continue", id="continue", variant="primary")
+        yield Footer()
+
+    def on_mount(self) -> None:
+        self.app.sub_title = "Step 2 of 3 · Mailbox"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id != "continue":
