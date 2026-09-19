@@ -40,9 +40,8 @@ class CredentialsScreen(Screen[None]):
                 yield Label("Vercel AI Gateway key", classes="field-label")
                 yield Input(value=existing.get("AI_GATEWAY_API_KEY", ""), placeholder="AI_GATEWAY_API_KEY", password=True, id="vercel_key")
 
-                with Horizontal(classes="button-row"):
-                    yield Static("", id="key_test_status")
-                    yield Button("Test key", id="test_key")
+                yield Button("Test key", id="test_key")
+                yield Static("", id="key_test_status")
 
                 yield Label("IMAP username", classes="field-label")
                 yield Input(value=existing.get("IMAP_USERNAME", ""), placeholder="you@example.com", id="imap_username")

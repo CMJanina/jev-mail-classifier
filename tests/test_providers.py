@@ -3,6 +3,7 @@ import pytest
 
 from jev_mail.config import JevSettings
 from jev_mail.providers import ProviderError, get_jev_client
+from jev_mail.providers.base import describe_http_error
 from jev_mail.providers.openrouter import OpenRouterJevClient
 from jev_mail.providers.typesafe_direct import TypeSafeDirectClient
 from jev_mail.providers.vercel_gateway import VercelGatewayJevClient
@@ -53,6 +54,33 @@ def test_decide_raises_provider_error_on_http_failure(monkeypatch):
 
     with pytest.raises(ProviderError):
         client.decide("body", CATEGORIES)
+
+
+def test_describe_http_error_status_error_is_short():
+    response = _fake_response({}, status_code=403)
+    exc = httpx.HTTPStatusError("403 Forbidden for url ...", request=response.request, response=response)
+    assert describe_http_error(exc) == "403 Forbidden"
+
+
+def test_describe_http_error_non_status_error_passes_through():
+    exc = httpx.ConnectError("Connection refused")
+    assert describe_http_error(exc) == "Connection refused"
+
+
+def test_decide_error_message_is_short_not_the_full_httpx_dump(monkeypatch):
+    """Regression: httpx's own str() on an HTTPStatusError includes the full
+    request URL plus an MDN boilerplate line -- unreadable dumped into a
+    single status line in the TUI or CLI stderr."""
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _fake_response({}, status_code=403))
+    client = OpenRouterJevClient(api_key="test-key")
+
+    with pytest.raises(ProviderError) as exc_info:
+        client.decide("body", CATEGORIES)
+
+    message = str(exc_info.value)
+    assert "403" in message
+    assert "developer.mozilla.org" not in message
+    assert len(message) < 100
 
 
 def test_decide_raises_provider_error_on_missing_answer(monkeypatch):

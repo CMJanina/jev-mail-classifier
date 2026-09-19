@@ -2,9 +2,21 @@ from __future__ import annotations
 
 from typing import Protocol
 
+import httpx
+
 
 class ProviderError(Exception):
     """Raised when a Jev backend can't be reached or returns something unexpected."""
+
+
+def describe_http_error(exc: httpx.HTTPError) -> str:
+    """A short, human-readable summary -- httpx's own str() on an
+    HTTPStatusError includes the full request URL plus an MDN boilerplate
+    line ("For more information check: developer.mozilla.org/...") which is
+    unreadable dumped into a status line or a single-line CLI error."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"{exc.response.status_code} {exc.response.reason_phrase}"
+    return str(exc)
 
 
 class JevClient(Protocol):

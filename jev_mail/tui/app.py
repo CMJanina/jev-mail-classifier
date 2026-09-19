@@ -81,18 +81,13 @@ VerticalScroll, ListView {
     padding: 1 0 0 0;
 }
 
-.button-row {
-    height: auto;
-    padding: 1 0 0 0;
+#test_key {
+    margin-top: 1;
 }
 
-.button-row Button {
-    margin-right: 1;
-}
-
-.button-row Static {
-    width: auto;
-    padding: 1 1 0 0;
+#key_test_status {
+    width: 1fr;
+    padding: 1 0;
 }
 
 .actions-dock {

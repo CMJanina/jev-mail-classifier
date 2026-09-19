@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import httpx
 
-from .base import ProviderError, build_noul_questions, extract_probabilities
+from .base import ProviderError, build_noul_questions, describe_http_error, extract_probabilities
 
 EVALUATION_URL = "https://ai-gateway.vercel.sh/v4/ai/evaluation-model"
 MODEL_ID = "typesafe-ai/jev"
@@ -37,7 +37,7 @@ class VercelGatewayJevClient:
             response.raise_for_status()
         except httpx.HTTPError as exc:
             raise ProviderError(
-                f"Vercel AI Gateway request failed: {exc} "
+                f"Vercel AI Gateway request failed: {describe_http_error(exc)} "
                 "(this backend is unverified -- see providers/vercel_gateway.py)"
             ) from exc
 
