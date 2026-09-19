@@ -30,8 +30,15 @@ class CredentialsScreen(Screen[None]):
             yield Input(placeholder="AI_GATEWAY_API_KEY", password=True, id="vercel_key")
             yield Label("IMAP username")
             yield Input(placeholder="you@example.com", id="imap_username")
-            yield Label("IMAP password (app password, if 2FA is on)")
+            yield Label("IMAP password (NOT your regular password if 2FA is on -- see below)")
             yield Input(placeholder="app password", password=True, id="imap_password")
+            yield Static(
+                "Need an app password? Gmail: myaccount.google.com/apppasswords "
+                "(enable IMAP first in Gmail Settings -> Forwarding and POP/IMAP). "
+                "Outlook: account.microsoft.com/security -> App passwords. "
+                "Full walkthrough: see the README's 'Getting your IMAP username & password' section.",
+                classes="hint",
+            )
             yield Button("Continue", id="continue", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

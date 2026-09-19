@@ -57,6 +57,7 @@ class MailboxConfig:
     password: str = ""
     folder: str = "INBOX"
     poll_interval_seconds: int = 60
+    max_emails_per_run: int = 25
 
 
 @dataclass
@@ -103,6 +104,7 @@ def load_config(config_path: str | Path, env_path: str | Path | None = None) -> 
         password=_interpolate(mb_raw.get("password", ""), env),
         folder=mb_raw.get("folder", "INBOX"),
         poll_interval_seconds=int(mb_raw.get("poll_interval_seconds", 60)),
+        max_emails_per_run=int(mb_raw.get("max_emails_per_run", 25)),
     )
 
     jev_raw = raw.get("jev", {})
@@ -137,6 +139,7 @@ def save_config(config: AppConfig, config_path: str | Path) -> None:
             "password": "${IMAP_PASSWORD}",
             "folder": config.mailbox.folder,
             "poll_interval_seconds": config.mailbox.poll_interval_seconds,
+            "max_emails_per_run": config.mailbox.max_emails_per_run,
         },
         "jev": {
             "provider": config.jev.provider,

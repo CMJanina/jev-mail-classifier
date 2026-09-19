@@ -48,10 +48,15 @@ class Mailbox:
             except Exception:
                 pass
 
-    def fetch_unprocessed(self) -> list[Email]:
+    def fetch_unprocessed(self, limit: int | None = None) -> list[Email]:
+        """`limit` caps how many messages get fetched+classified in one call
+        -- keeps a single run/poll bounded (cost, rate limits, one huge
+        backlog) instead of processing an entire inbox at once."""
         uids = self._server.search(["UNKEYWORD", PROCESSED_KEYWORD])
         if not uids:
             return []
+        if limit is not None:
+            uids = uids[:limit]
         response = self._server.fetch(uids, ["RFC822"])
         emails = []
         for uid, data in response.items():

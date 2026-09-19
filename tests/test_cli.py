@@ -28,6 +28,31 @@ def test_build_parser_defaults_and_dry_run_flag():
     assert args.command == "configure"
 
 
+def test_process_unprocessed_passes_limit_to_fetch():
+    mailbox = MagicMock()
+    mailbox.fetch_unprocessed.return_value = []
+    client = MagicMock()
+
+    config = _config()
+    config.mailbox.max_emails_per_run = 7
+    cli._process_unprocessed(mailbox, client, config, dry_run=False)
+
+    mailbox.fetch_unprocessed.assert_called_once_with(limit=7)
+
+
+def test_process_unprocessed_warns_when_limit_is_hit(capsys):
+    mailbox = MagicMock()
+    mailbox.fetch_unprocessed.return_value = [Email(uid=1, subject="One", body="body")]
+    client = MagicMock()
+    client.decide.return_value = {"invoice": 0.9}
+
+    config = _config()
+    config.mailbox.max_emails_per_run = 1
+    cli._process_unprocessed(mailbox, client, config, dry_run=False)
+
+    assert "max_emails_per_run" in capsys.readouterr().out
+
+
 def test_process_unprocessed_dry_run_does_not_mutate_mailbox(capsys):
     mailbox = MagicMock()
     mailbox.fetch_unprocessed.return_value = [Email(uid=1, subject="Invoice #1", body="Please pay")]

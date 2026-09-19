@@ -46,6 +46,20 @@ categories:
     assert config.categories[0].actions[0].type == "tag"
 
 
+def test_load_config_max_emails_per_run_defaults_and_overrides(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text('mailbox:\n  host: imap.example.com\ncategories:\n  spam:\n    description: spam\n    actions: []\n')
+    config = load_config(config_path, env_path=tmp_path / "does-not-exist.env")
+    assert config.mailbox.max_emails_per_run == 25
+
+    config_path.write_text(
+        "mailbox:\n  host: imap.example.com\n  max_emails_per_run: 5\n"
+        "categories:\n  spam:\n    description: spam\n    actions: []\n"
+    )
+    config = load_config(config_path, env_path=tmp_path / "does-not-exist.env")
+    assert config.mailbox.max_emails_per_run == 5
+
+
 def test_load_config_missing_env_var_raises(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(

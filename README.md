@@ -59,6 +59,38 @@ jev-mail configure        # reopen the TUI to add/edit categories any time
 > **Coming soon:** `pipx install jev-mail-classifier` -- for now, `install.sh` after
 > cloning is the whole setup.
 
+## Getting your IMAP username & password
+
+The wizard asks for these on the first screen. "Username" is just your email address;
+"password" is where people get stuck, because **if your account has 2-factor
+authentication on, your normal login password will not work over IMAP** -- you need a
+separate *app password* instead.
+
+**Gmail**
+1. Turn on IMAP: Gmail Settings (gear icon) -> **See all settings** -> **Forwarding and
+   POP/IMAP** tab -> enable IMAP -> Save.
+2. Create an app password: go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   (requires 2-Step Verification to be on -- turn it on first if it isn't). Name it
+   anything (e.g. "jev-mail"), copy the 16-character password it gives you.
+3. Use your full Gmail address as the username, and that 16-character code as the
+   password. Host: `imap.gmail.com`, port `993`.
+
+**Outlook / Microsoft 365**
+1. Go to [account.microsoft.com/security](https://account.microsoft.com/security) ->
+   **Advanced security options** -> **App passwords** -> create one.
+2. Username is your full email address, password is the app password. Host:
+   `outlook.office365.com`, port `993`.
+
+**Yahoo Mail**
+1. Account Info -> **Account Security** -> turn on 2-step verification -> **Generate
+   app password**. Host: `imap.mail.yahoo.com`, port `993`.
+
+**Any other provider**
+Look for "IMAP settings" in your provider's account/security settings -- you need the
+IMAP host and port (almost always `993`), and, if 2FA is on, an app-specific password
+generated the same way. If 2FA is off, your regular email password usually works, but
+an app password is safer since it can be revoked without changing your main password.
+
 ## What it looks like
 
 `jev-mail configure` is a three-step terminal UI:
@@ -112,6 +144,11 @@ categories:
       - type: webhook
         url: ${SLACK_WEBHOOK_URL}
 ```
+
+`mailbox.max_emails_per_run` (default `25`) caps how many unprocessed emails get
+classified in a single `run` or poll cycle -- protects against a huge backlog burning
+through your Jev quota or a run taking forever the first time you point this at a real
+inbox. If a run hits the cap, it prints a notice and picks up the rest next time.
 
 | Action        | What it does                                   |
 | ------------- | ----------------------------------------------- |

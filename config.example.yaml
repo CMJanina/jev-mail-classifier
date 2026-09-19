@@ -10,6 +10,7 @@ mailbox:
   password: ${IMAP_PASSWORD}
   folder: INBOX
   poll_interval_seconds: 60 # used by `watch` only if the server has no IDLE support
+  max_emails_per_run: 25 # caps how many unprocessed emails get classified in one run/poll
 
 jev:
   provider: auto # auto | typesafe | openrouter | vercel

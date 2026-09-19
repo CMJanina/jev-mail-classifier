@@ -27,6 +27,31 @@ def test_fetch_unprocessed_parses_subject_and_body():
     assert "World" in emails[0].body
 
 
+def test_fetch_unprocessed_respects_limit():
+    fake_server = MagicMock()
+    fake_server.search.return_value = [1, 2, 3, 4, 5]
+    fake_server.fetch.return_value = {
+        1: {b"RFC822": _raw_message("One", "body")},
+        2: {b"RFC822": _raw_message("Two", "body")},
+    }
+
+    with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server) as mailbox:
+        mailbox.fetch_unprocessed(limit=2)
+
+    fake_server.fetch.assert_called_once_with([1, 2], ["RFC822"])
+
+
+def test_fetch_unprocessed_no_limit_fetches_all():
+    fake_server = MagicMock()
+    fake_server.search.return_value = [1, 2, 3]
+    fake_server.fetch.return_value = {}
+
+    with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server) as mailbox:
+        mailbox.fetch_unprocessed()
+
+    fake_server.fetch.assert_called_once_with([1, 2, 3], ["RFC822"])
+
+
 def test_fetch_unprocessed_returns_empty_when_no_uids():
     fake_server = MagicMock()
     fake_server.search.return_value = []

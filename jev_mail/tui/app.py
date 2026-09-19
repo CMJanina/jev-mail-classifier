@@ -14,6 +14,10 @@ CSS = """
     text-style: bold;
     padding: 1 0;
 }
+.hint {
+    color: $text-muted;
+    padding: 1 0;
+}
 """
 
 

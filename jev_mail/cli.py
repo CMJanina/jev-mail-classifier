@@ -19,7 +19,13 @@ def _paths(args: argparse.Namespace) -> tuple[Path, Path]:
 
 
 def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig, dry_run: bool) -> None:
-    for mail in mailbox.fetch_unprocessed():
+    emails = mailbox.fetch_unprocessed(limit=config.mailbox.max_emails_per_run)
+    if len(emails) == config.mailbox.max_emails_per_run:
+        print(
+            f"[jev-mail] hit max_emails_per_run ({config.mailbox.max_emails_per_run}) -- "
+            "there may be more unprocessed mail left for next run"
+        )
+    for mail in emails:
         probabilities = classify(client, config, mail.state)
         matched = matched_categories(config, probabilities)
 

@@ -27,6 +27,8 @@ class MailboxScreen(Screen[MailboxConfig]):
             yield Input(value=self._mailbox.folder, id="folder")
             yield Label("Poll interval in seconds (used by `watch` if the server has no IDLE support)")
             yield Input(value=str(self._mailbox.poll_interval_seconds), id="poll_interval")
+            yield Label("Max emails to classify per run/poll (caps cost and time on a big backlog)")
+            yield Input(value=str(self._mailbox.max_emails_per_run), id="max_emails_per_run")
             yield Button("Continue", id="continue", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -40,5 +42,6 @@ class MailboxScreen(Screen[MailboxConfig]):
                 password=self._mailbox.password,
                 folder=self.query_one("#folder", Input).value.strip() or "INBOX",
                 poll_interval_seconds=int(self.query_one("#poll_interval", Input).value or 60),
+                max_emails_per_run=int(self.query_one("#max_emails_per_run", Input).value or 25),
             )
         )
