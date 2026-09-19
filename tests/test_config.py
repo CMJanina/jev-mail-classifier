@@ -1,0 +1,137 @@
+import os
+
+import pytest
+
+from jev_mail.config import (
+    Action,
+    AppConfig,
+    Category,
+    ConfigError,
+    JevSettings,
+    MailboxConfig,
+    load_config,
+    save_config,
+    save_env,
+)
+
+
+def test_load_config_interpolates_env_and_parses_categories(tmp_path, monkeypatch):
+    monkeypatch.setenv("IMAP_USERNAME", "me@example.com")
+    monkeypatch.setenv("IMAP_PASSWORD", "secret")
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+mailbox:
+  host: imap.example.com
+  username: ${IMAP_USERNAME}
+  password: ${IMAP_PASSWORD}
+jev:
+  default_threshold: 0.7
+categories:
+  invoice:
+    description: "Invoice or billing"
+    actions:
+      - type: tag
+        value: Invoice
+"""
+    )
+
+    config = load_config(config_path, env_path=tmp_path / "does-not-exist.env")
+
+    assert config.mailbox.username == "me@example.com"
+    assert config.mailbox.password == "secret"
+    assert config.jev.default_threshold == 0.7
+    assert len(config.categories) == 1
+    assert config.categories[0].name == "invoice"
+    assert config.categories[0].actions[0].type == "tag"
+
+
+def test_load_config_missing_env_var_raises(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text(
+        """
+mailbox:
+  host: imap.example.com
+  username: ${DEFINITELY_NOT_SET}
+categories:
+  spam:
+    description: spam
+    actions: []
+"""
+    )
+    with pytest.raises(ConfigError):
+        load_config(config_path, env_path=tmp_path / "does-not-exist.env")
+
+
+def test_load_config_no_categories_raises(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("mailbox:\n  host: imap.example.com\ncategories: {}\n")
+    with pytest.raises(ConfigError):
+        load_config(config_path, env_path=tmp_path / "does-not-exist.env")
+
+
+def test_load_config_missing_file_raises(tmp_path):
+    with pytest.raises(ConfigError):
+        load_config(tmp_path / "nope.yaml")
+
+
+def test_save_config_never_writes_literal_secrets(tmp_path):
+    config = AppConfig(
+        mailbox=MailboxConfig(host="imap.example.com", username="me@example.com", password="hunter2"),
+        jev=JevSettings(),
+        categories=[Category(name="urgent", description="Urgent", actions=[Action(type="flag")])],
+    )
+    out_path = tmp_path / "config.yaml"
+    save_config(config, out_path)
+
+    text = out_path.read_text()
+    assert "hunter2" not in text
+    assert "me@example.com" not in text
+    assert "${IMAP_USERNAME}" in text
+    assert "${IMAP_PASSWORD}" in text
+
+
+def test_save_config_round_trips_through_load(tmp_path, monkeypatch):
+    monkeypatch.setenv("IMAP_USERNAME", "me@example.com")
+    monkeypatch.setenv("IMAP_PASSWORD", "hunter2")
+    config = AppConfig(
+        mailbox=MailboxConfig(host="imap.example.com", username="me@example.com", password="hunter2"),
+        jev=JevSettings(default_threshold=0.5),
+        categories=[
+            Category(
+                name="invoice",
+                description="Invoice",
+                threshold=0.8,
+                actions=[Action(type="move", folder="Invoices")],
+            )
+        ],
+    )
+    out_path = tmp_path / "config.yaml"
+    save_config(config, out_path)
+
+    reloaded = load_config(out_path, env_path=tmp_path / "does-not-exist.env")
+    assert reloaded.mailbox.host == "imap.example.com"
+    assert reloaded.mailbox.username == "me@example.com"
+    assert reloaded.categories[0].threshold == 0.8
+    assert reloaded.categories[0].actions[0].folder == "Invoices"
+
+
+def test_save_env_merges_and_preserves_existing(tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text("EXISTING=keep\nOPENROUTER_API_KEY=old\n")
+
+    save_env({"OPENROUTER_API_KEY": "new", "IMAP_USERNAME": "me@example.com"}, env_path)
+
+    content = env_path.read_text()
+    assert "EXISTING=keep" in content
+    assert "OPENROUTER_API_KEY=new" in content
+    assert "IMAP_USERNAME=me@example.com" in content
+
+
+def test_save_env_skips_empty_values(tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text("KEEP=me\n")
+    save_env({"KEEP": "", "NEW": "value"}, env_path)
+    content = env_path.read_text()
+    assert "KEEP=me" in content
+    assert "NEW=value" in content
