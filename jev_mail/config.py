@@ -157,17 +157,24 @@ def save_config(config: AppConfig, config_path: str | Path) -> None:
     Path(config_path).write_text(yaml.safe_dump(raw, sort_keys=False, default_flow_style=False))
 
 
-def save_env(values: dict[str, str], env_path: str | Path) -> None:
-    """Merges `values` into the .env file at `env_path`, preserving any existing
-    keys not being updated. Empty values are skipped (keeps prior value, if any)."""
+def read_env(env_path: str | Path) -> dict[str, str]:
+    """Parses a .env file into a plain dict, or {} if it doesn't exist yet."""
     env_path = Path(env_path)
-    existing: dict[str, str] = {}
+    values: dict[str, str] = {}
     if env_path.exists():
         for line in env_path.read_text().splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
             key, _, val = line.partition("=")
-            existing[key.strip()] = val.strip()
+            values[key.strip()] = val.strip()
+    return values
+
+
+def save_env(values: dict[str, str], env_path: str | Path) -> None:
+    """Merges `values` into the .env file at `env_path`, preserving any existing
+    keys not being updated. Empty values are skipped (keeps prior value, if any)."""
+    env_path = Path(env_path)
+    existing = read_env(env_path)
     existing.update({k: v for k, v in values.items() if v})
     env_path.write_text("".join(f"{k}={v}\n" for k, v in existing.items()))

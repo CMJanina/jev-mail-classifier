@@ -130,6 +130,21 @@ def test_save_config_round_trips_through_load(tmp_path, monkeypatch):
     assert reloaded.categories[0].actions[0].folder == "Invoices"
 
 
+def test_read_env_returns_empty_dict_for_missing_file(tmp_path):
+    from jev_mail.config import read_env
+
+    assert read_env(tmp_path / "does-not-exist.env") == {}
+
+
+def test_read_env_parses_existing_file(tmp_path):
+    from jev_mail.config import read_env
+
+    env_path = tmp_path / ".env"
+    env_path.write_text("OPENROUTER_API_KEY=abc123\nIMAP_USERNAME=me@example.com\n")
+
+    assert read_env(env_path) == {"OPENROUTER_API_KEY": "abc123", "IMAP_USERNAME": "me@example.com"}
+
+
 def test_save_env_merges_and_preserves_existing(tmp_path):
     env_path = tmp_path / ".env"
     env_path.write_text("EXISTING=keep\nOPENROUTER_API_KEY=old\n")

@@ -47,14 +47,20 @@ That's it -- `install.sh` sets up a virtualenv, installs the package, and drops 
 straight into the setup wizard. Paste **one** Jev API key (TypeSafe, OpenRouter, or
 Vercel AI Gateway -- whichever you have), your IMAP login, and start adding categories.
 
-Once configured:
+Once configured, run it with `./jev-mail` from inside the project directory --
+`install.sh` installs into a local `.venv`, and `./jev-mail` is a small wrapper that
+finds it for you, so there's no venv to activate and nothing to add to your shell PATH:
 
 ```bash
-jev-mail run             # classify unprocessed mail once, then exit (cron-friendly)
-jev-mail run --dry-run   # see what WOULD happen, without touching your mailbox
-jev-mail watch           # keep classifying new mail as it arrives (IMAP IDLE)
-jev-mail configure        # reopen the TUI to add/edit categories any time
+./jev-mail run             # classify unprocessed mail once, then exit (cron-friendly)
+./jev-mail run --dry-run   # see what WOULD happen, without touching your mailbox
+./jev-mail watch           # keep classifying new mail as it arrives (IMAP IDLE)
+./jev-mail configure       # reopen the TUI to add/edit categories or credentials any time
 ```
+
+Re-running `./install.sh` later is safe -- it won't ask for your key/login again if
+`config.yaml` already exists, and the credentials screen always shows what's already
+saved (masked) rather than blank fields.
 
 > **Coming soon:** `pipx install jev-mail-classifier` -- for now, `install.sh` after
 > cloning is the whole setup.

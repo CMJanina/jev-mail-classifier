@@ -13,8 +13,18 @@ echo "Setting up jev-mail-classifier in ${here}/.venv ..."
 python3 -m venv .venv
 .venv/bin/pip install --quiet --upgrade pip
 .venv/bin/pip install --quiet -e .
+chmod +x "$here/jev-mail"
 
 echo ""
-echo "Installed. Launching the setup wizard (paste one API key + your IMAP login)..."
+echo "Installed. From now on, run it from this directory with ./jev-mail"
+echo "(e.g. ./jev-mail run --dry-run) -- no venv activation needed."
 echo ""
-exec .venv/bin/jev-mail configure
+
+if [ -f "$here/config.yaml" ]; then
+  echo "config.yaml already exists -- skipping the setup wizard."
+  echo "Run './jev-mail configure' any time to add/edit categories or credentials."
+else
+  echo "Launching the setup wizard (paste one API key + your IMAP login)..."
+  echo ""
+  exec "$here/jev-mail" configure
+fi

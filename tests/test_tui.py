@@ -50,6 +50,23 @@ async def test_full_configure_flow_writes_env_and_config(tmp_path):
     assert reloaded.categories[0].actions[0].value == "Invoice"
 
 
+async def test_credentials_screen_prefills_from_existing_env(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    env_path = tmp_path / ".env"
+    env_path.write_text("OPENROUTER_API_KEY=already-saved\nIMAP_USERNAME=me@example.com\n")
+
+    app = JevMailConfigApp(config_path, env_path)
+    async with app.run_test(size=(100, 60)) as pilot:
+        await pilot.pause()
+        assert pilot.app.screen.query_one("#openrouter_key", Input).value == "already-saved"
+        assert pilot.app.screen.query_one("#imap_username", Input).value == "me@example.com"
+
+        # Continuing without touching anything must NOT wipe the saved key.
+        await pilot.click("#continue")
+
+    assert "OPENROUTER_API_KEY=already-saved" in env_path.read_text()
+
+
 async def test_delete_category(tmp_path):
     from jev_mail.config import Action, AppConfig, Category, JevSettings, MailboxConfig
 
