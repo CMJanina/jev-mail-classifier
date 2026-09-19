@@ -112,8 +112,12 @@ an app password is safer since it can be revoked without changing your main pass
    `a` add &middot; `e` edit &middot; `d` delete &middot; `s` save & exit
 
 <p align="center">
-  <img src="docs/screenshots/tui-credentials.png" alt="Credentials screen: paste one Jev key and your IMAP login" width="49%">
-  <img src="docs/screenshots/tui-add-category.png" alt="Add category screen: description plus a checklist of actions" width="49%">
+  <img src="media/screenshots/tui-1-credentials.png" alt="Credentials screen: paste one Jev key and your IMAP login" width="49%">
+  <img src="media/screenshots/tui-2-mailbox.png" alt="Mailbox screen: IMAP host, port, folder, poll interval" width="49%">
+</p>
+<p align="center">
+  <img src="media/screenshots/tui-3-categories.png" alt="Categories screen: live list of configured categories" width="49%">
+  <img src="media/screenshots/tui-4-category-edit.png" alt="Edit category screen: description plus a checklist of actions" width="49%">
 </p>
 
 Each category is a plain-language description plus a checklist of actions -- tag, move,
