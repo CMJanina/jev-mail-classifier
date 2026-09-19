@@ -38,7 +38,7 @@ tag, move, flag, or ping a webhook -- all from a terminal UI, no code required.
 ## Quickstart
 
 ```bash
-git clone https://github.com/<you>/jev-mail-classifier.git
+git clone https://github.com/parth-kp/jev-mail-classifier
 cd jev-mail-classifier
 ./install.sh
 ```
