@@ -1,9 +1,28 @@
+from textual.containers import VerticalScroll
 from textual.widgets import Checkbox, Input, Static
 
 from jev_mail.config import load_config
 from jev_mail.providers import ProviderError
 from jev_mail.tui.app import JevMailConfigApp
 from jev_mail.tui.screens import credentials_screen as credentials_screen_module
+
+
+async def test_every_screen_scroll_area_actually_gets_space(tmp_path):
+    """Regression test: a plain Horizontal defaults to height:1fr, which once
+    silently broke height:auto on '.actions-dock' and squeezed the sibling
+    VerticalScroll down to 1 row -- fields were still settable via `.value =`
+    (bypassing layout entirely) so earlier tests didn't catch it. This checks
+    real layout, not just that a value round-trips."""
+    app = JevMailConfigApp(tmp_path / "config.yaml", tmp_path / ".env")
+    async with app.run_test(size=(100, 50)) as pilot:
+        await pilot.pause()
+        for screen_name in ["credentials", "mailbox"]:
+            scroll = pilot.app.screen.query_one(VerticalScroll)
+            assert scroll.region.height > 10, f"{screen_name} screen's scroll area collapsed: {scroll.region}"
+            if screen_name == "mailbox":
+                pilot.app.screen.query_one("#host", Input).value = "imap.example.com"
+            await pilot.click("#continue")
+            await pilot.pause()
 
 
 async def test_full_configure_flow_writes_env_and_config(tmp_path):

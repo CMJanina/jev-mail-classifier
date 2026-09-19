@@ -13,6 +13,14 @@ CSS = """
 Screen {
     align: center middle;
     background: $surface;
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 1;
+    scrollbar-color: $accent 70%;
+    scrollbar-color-hover: $accent;
+    scrollbar-color-active: $accent;
+    scrollbar-background: $panel;
+    scrollbar-background-hover: $panel;
+    scrollbar-background-active: $panel;
 }
 
 #panel {
@@ -22,10 +30,19 @@ Screen {
     border: round $accent;
     background: $panel;
     padding: 1 3;
+    scrollbar-size-vertical: 1;
+    scrollbar-color: $accent 70%;
+    scrollbar-background: $panel;
 }
 
 #panel > VerticalScroll {
     height: 1fr;
+}
+
+/* A plain Horizontal defaults to height:1fr, which breaks height:auto
+   measurement on its parent (e.g. the docked action bar) -- pin it down. */
+.actions-dock Horizontal {
+    height: auto;
 }
 
 .title {
