@@ -101,6 +101,11 @@ an app password is safer since it can be revoked without changing your main pass
 3. **Categories** -- a live list you manage with single keystrokes:
    `a` add &middot; `e` edit &middot; `d` delete &middot; `s` save & exit
 
+<p align="center">
+  <img src="docs/screenshots/tui-credentials.png" alt="Credentials screen: paste one Jev key and your IMAP login" width="49%">
+  <img src="docs/screenshots/tui-add-category.png" alt="Add category screen: description plus a checklist of actions" width="49%">
+</p>
+
 Each category is a plain-language description plus a checklist of actions -- tag, move,
 flag, mark read, or hit a webhook -- no YAML syntax to remember.
 
