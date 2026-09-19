@@ -1,0 +1,39 @@
+# Generated automatically by `jev-mail configure`. Hand-editing is fine too --
+# this file is just for reference / a starting point if you'd rather not use
+# the TUI. Secrets never go here: they live in .env and are referenced as
+# ${VAR}.
+
+mailbox:
+  host: imap.gmail.com
+  port: 993
+  username: ${IMAP_USERNAME}
+  password: ${IMAP_PASSWORD}
+  folder: INBOX
+  poll_interval_seconds: 60 # used by `watch` only if the server has no IDLE support
+
+jev:
+  provider: auto # auto | typesafe | openrouter | vercel
+  default_threshold: 0.6
+
+categories:
+  invoice:
+    description: "Invoice, billing statement, or payment request"
+    actions:
+      - type: tag
+        value: Invoice
+      - type: move
+        folder: Invoices
+
+  urgent:
+    description: "Time-sensitive, needs action today"
+    threshold: 0.7 # overrides jev.default_threshold for this category
+    actions:
+      - type: flag
+      - type: webhook
+        url: ${SLACK_WEBHOOK_URL}
+
+  spam:
+    description: "Spam, phishing, or an unsolicited sales pitch"
+    actions:
+      - type: move
+        folder: Spam
