@@ -76,6 +76,18 @@ class Mailbox:
     def set_seen(self, uid: int, seen: bool) -> None:
         (self._server.add_flags if seen else self._server.remove_flags)([uid], [b"\\Seen"])
 
+    def supports_idle(self) -> bool:
+        return bool(self._server.has_capability("IDLE"))
+
+    def idle(self) -> None:
+        self._server.idle()
+
+    def idle_check(self, timeout: int = 30) -> list:
+        return self._server.idle_check(timeout=timeout)
+
+    def idle_done(self) -> None:
+        self._server.idle_done()
+
 
 def _decode_subject(msg: Message) -> str:
     raw = msg.get("Subject", "")
