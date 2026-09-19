@@ -18,10 +18,9 @@
 
 *Tag, move, flag, and notify -- no LLM prompt engineering, no JSON parsing, no per-email API bill that adds up.*
 
-<video src="media/brag.mp4" poster="media/brag.jpg" controls width="720">
-  Your browser doesn't support embedded video --
-  <a href="media/brag.mp4">watch/download brag.mp4</a> instead.
-</video>
+[![jev-mail-classifier demo](media/brag.gif)](media/brag.mp4)
+
+*(GIF preview above -- [watch the full clip with sound](media/brag.mp4))*
 
 </div>
 
