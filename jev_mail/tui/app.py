@@ -13,14 +13,6 @@ CSS = """
 Screen {
     align: center middle;
     background: $surface;
-    scrollbar-size-vertical: 1;
-    scrollbar-size-horizontal: 1;
-    scrollbar-color: $accent 70%;
-    scrollbar-color-hover: $accent;
-    scrollbar-color-active: $accent;
-    scrollbar-background: $panel;
-    scrollbar-background-hover: $panel;
-    scrollbar-background-active: $panel;
 }
 
 #panel {
@@ -30,13 +22,24 @@ Screen {
     border: round $accent;
     background: $panel;
     padding: 1 3;
-    scrollbar-size-vertical: 1;
-    scrollbar-color: $accent 70%;
-    scrollbar-background: $panel;
 }
 
 #panel > VerticalScroll {
     height: 1fr;
+}
+
+/* scrollbar-* properties don't inherit from an ancestor -- they have to be
+   set on the actual scrollable widget, hence the type selectors here rather
+   than on Screen/#panel. */
+VerticalScroll, ListView {
+    scrollbar-size-vertical: 1;
+    scrollbar-size-horizontal: 1;
+    scrollbar-color: $accent 60%;
+    scrollbar-color-hover: $accent;
+    scrollbar-color-active: $accent;
+    scrollbar-background: $panel;
+    scrollbar-background-hover: $panel;
+    scrollbar-background-active: $panel;
 }
 
 /* A plain Horizontal defaults to height:1fr, which breaks height:auto
@@ -131,6 +134,7 @@ class JevMailConfigApp(App):
 
     def __init__(self, config_path: Path, env_path: Path, config: AppConfig | None = None):
         super().__init__()
+        self.theme = "gruvbox"
         self.config_path = config_path
         self.env_path = env_path
         self.config = config or AppConfig(mailbox=MailboxConfig(host=""), jev=JevSettings(), categories=[])
