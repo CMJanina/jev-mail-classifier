@@ -88,6 +88,22 @@ async def test_credentials_screen_prefills_from_existing_env(tmp_path):
     assert "OPENROUTER_API_KEY=already-saved" in env_path.read_text()
 
 
+async def test_clearing_a_prefilled_field_and_saving_removes_it(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    env_path = tmp_path / ".env"
+    env_path.write_text("OPENROUTER_API_KEY=already-saved\nIMAP_USERNAME=me@example.com\n")
+
+    app = JevMailConfigApp(config_path, env_path)
+    async with app.run_test(size=(100, 60)) as pilot:
+        await pilot.pause()
+        pilot.app.screen.query_one("#openrouter_key", Input).value = ""
+        await pilot.click("#continue")
+
+    content = env_path.read_text()
+    assert "OPENROUTER_API_KEY" not in content
+    assert "IMAP_USERNAME=me@example.com" in content
+
+
 async def test_test_key_button_shows_green_tick_on_success(monkeypatch, tmp_path):
     fake_client = type("FakeClient", (), {"decide": lambda self, state, categories: {"ok": 0.99}})()
     monkeypatch.setattr(credentials_screen_module, "get_jev_client", lambda settings, env: fake_client)

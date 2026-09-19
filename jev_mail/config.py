@@ -174,9 +174,16 @@ def read_env(env_path: str | Path) -> dict[str, str]:
 
 
 def save_env(values: dict[str, str], env_path: str | Path) -> None:
-    """Merges `values` into the .env file at `env_path`, preserving any existing
-    keys not being updated. Empty values are skipped (keeps prior value, if any)."""
+    """Merges `values` into the .env file at `env_path`: a non-empty value
+    sets that key, an empty value removes it. Keys not present in `values`
+    at all are left untouched. (The credentials screen pre-fills every field
+    from the existing .env, so an empty field here means the user actually
+    cleared it -- not "didn't get around to typing anything.")"""
     env_path = Path(env_path)
     existing = read_env(env_path)
-    existing.update({k: v for k, v in values.items() if v})
+    for key, value in values.items():
+        if value:
+            existing[key] = value
+        else:
+            existing.pop(key, None)
     env_path.write_text("".join(f"{k}={v}\n" for k, v in existing.items()))

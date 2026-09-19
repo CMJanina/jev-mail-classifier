@@ -164,10 +164,26 @@ def test_save_env_merges_and_preserves_existing(tmp_path):
     assert "IMAP_USERNAME=me@example.com" in content
 
 
-def test_save_env_skips_empty_values(tmp_path):
+def test_save_env_removes_key_when_new_value_is_empty(tmp_path):
+    """Regression: this used to silently keep the old value, so clearing a
+    field in the credentials screen and hitting Continue did nothing."""
     env_path = tmp_path / ".env"
-    env_path.write_text("KEEP=me\n")
-    save_env({"KEEP": "", "NEW": "value"}, env_path)
+    env_path.write_text("REMOVE_ME=old\nKEEP=me\n")
+
+    save_env({"REMOVE_ME": "", "NEW": "value"}, env_path)
+
     content = env_path.read_text()
+    assert "REMOVE_ME" not in content
     assert "KEEP=me" in content
+    assert "NEW=value" in content
+
+
+def test_save_env_leaves_keys_not_passed_untouched(tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text("UNTOUCHED=still-here\n")
+
+    save_env({"NEW": "value"}, env_path)
+
+    content = env_path.read_text()
+    assert "UNTOUCHED=still-here" in content
     assert "NEW=value" in content
