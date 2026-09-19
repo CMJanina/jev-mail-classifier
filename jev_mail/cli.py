@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import imaplib
 import sys
 import time
 from pathlib import Path
@@ -46,6 +47,12 @@ def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig,
             mailbox.mark_processed(mail.uid)
 
 
+def _mailbox_error_message(exc: Exception, config: AppConfig) -> str:
+    if isinstance(exc, OSError):
+        return f"couldn't connect to {config.mailbox.host}:{config.mailbox.port} -- {exc}"
+    return f"IMAP error talking to {config.mailbox.host} -- {exc}"
+
+
 def cmd_configure(args: argparse.Namespace) -> int:
     from jev_mail.tui.app import JevMailConfigApp
 
@@ -68,8 +75,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    with Mailbox(config.mailbox) as mailbox:
-        _process_unprocessed(mailbox, client, config, args.dry_run)
+    try:
+        with Mailbox(config.mailbox) as mailbox:
+            _process_unprocessed(mailbox, client, config, args.dry_run)
+    except (OSError, imaplib.IMAP4.error) as exc:
+        print(f"error: {_mailbox_error_message(exc, config)}", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -83,16 +94,20 @@ def cmd_watch(args: argparse.Namespace) -> int:
         return 1
 
     print(f"watching {config.mailbox.folder}@{config.mailbox.host} (ctrl-c to stop)...")
-    with Mailbox(config.mailbox) as mailbox:
-        _process_unprocessed(mailbox, client, config, args.dry_run)
-        while True:
-            if mailbox.supports_idle():
-                mailbox.idle()
-                mailbox.idle_check(timeout=min(config.mailbox.poll_interval_seconds, 600))
-                mailbox.idle_done()
-            else:
-                time.sleep(config.mailbox.poll_interval_seconds)
+    try:
+        with Mailbox(config.mailbox) as mailbox:
             _process_unprocessed(mailbox, client, config, args.dry_run)
+            while True:
+                if mailbox.supports_idle():
+                    mailbox.idle()
+                    mailbox.idle_check(timeout=min(config.mailbox.poll_interval_seconds, 600))
+                    mailbox.idle_done()
+                else:
+                    time.sleep(config.mailbox.poll_interval_seconds)
+                _process_unprocessed(mailbox, client, config, args.dry_run)
+    except (OSError, imaplib.IMAP4.error) as exc:
+        print(f"error: {_mailbox_error_message(exc, config)}", file=sys.stderr)
+        return 1
 
 
 def build_parser() -> argparse.ArgumentParser:

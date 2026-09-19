@@ -1,7 +1,9 @@
-from textual.widgets import Checkbox, Input
+from textual.widgets import Checkbox, Input, Static
 
 from jev_mail.config import load_config
+from jev_mail.providers import ProviderError
 from jev_mail.tui.app import JevMailConfigApp
+from jev_mail.tui.screens import credentials_screen as credentials_screen_module
 
 
 async def test_full_configure_flow_writes_env_and_config(tmp_path):
@@ -67,6 +69,39 @@ async def test_credentials_screen_prefills_from_existing_env(tmp_path):
     assert "OPENROUTER_API_KEY=already-saved" in env_path.read_text()
 
 
+async def test_test_key_button_shows_green_tick_on_success(monkeypatch, tmp_path):
+    fake_client = type("FakeClient", (), {"decide": lambda self, state, categories: {"ok": 0.99}})()
+    monkeypatch.setattr(credentials_screen_module, "get_jev_client", lambda settings, env: fake_client)
+
+    app = JevMailConfigApp(tmp_path / "config.yaml", tmp_path / ".env")
+    async with app.run_test(size=(100, 60)) as pilot:
+        await pilot.pause()
+        pilot.app.screen.query_one("#openrouter_key", Input).value = "or-test-key"
+        await pilot.click("#test_key")
+        await pilot.app.screen._test_worker.wait()
+        await pilot.pause()
+
+        status = pilot.app.screen.query_one("#key_test_status", Static).content
+        assert "Key works" in status
+
+
+async def test_test_key_button_shows_error_on_failure(monkeypatch, tmp_path):
+    def raise_provider_error(settings, env):
+        raise ProviderError("no Jev API key found")
+
+    monkeypatch.setattr(credentials_screen_module, "get_jev_client", raise_provider_error)
+
+    app = JevMailConfigApp(tmp_path / "config.yaml", tmp_path / ".env")
+    async with app.run_test(size=(100, 60)) as pilot:
+        await pilot.pause()
+        await pilot.click("#test_key")
+        await pilot.app.screen._test_worker.wait()
+        await pilot.pause()
+
+        status = pilot.app.screen.query_one("#key_test_status", Static).content
+        assert "no Jev API key found" in status
+
+
 async def test_delete_category(tmp_path):
     from jev_mail.config import Action, AppConfig, Category, JevSettings, MailboxConfig
 
@@ -95,9 +130,34 @@ async def test_cancel_edit_does_not_add_category(tmp_path):
     async with app.run_test(size=(100, 60)) as pilot:
         await pilot.pause()
         await pilot.click("#continue")
+        await pilot.pause()
+        pilot.app.screen.query_one("#host", Input).value = "imap.example.com"
         await pilot.click("#continue")
 
         await pilot.press("a")
         await pilot.click("#cancel")
 
         assert app.config.categories == []
+
+
+async def test_mailbox_screen_rejects_empty_host(tmp_path):
+    app = JevMailConfigApp(tmp_path / "config.yaml", tmp_path / ".env")
+
+    async with app.run_test(size=(100, 60)) as pilot:
+        await pilot.pause()
+        await pilot.click("#continue")  # credentials -> mailbox
+        await pilot.pause()
+
+        await pilot.click("#continue")  # host still blank
+
+        assert pilot.app.screen.query_one("#host", Input) is not None
+        assert "required" in pilot.app.screen.query_one("#mailbox_error", Static).content
+
+        # Button's press-animation guard ignores a second click on the same
+        # button within ~0.2s (Textual's `active_effect_duration`) -- wait it out.
+        await pilot.pause(0.3)
+        pilot.app.screen.query_one("#host", Input).value = "imap.example.com"
+        await pilot.click("#continue")
+        await pilot.pause()
+
+        assert app.config.mailbox.host == "imap.example.com"

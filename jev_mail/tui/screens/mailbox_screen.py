@@ -29,14 +29,19 @@ class MailboxScreen(Screen[MailboxConfig]):
             yield Input(value=str(self._mailbox.poll_interval_seconds), id="poll_interval")
             yield Label("Max emails to classify per run/poll (caps cost and time on a big backlog)")
             yield Input(value=str(self._mailbox.max_emails_per_run), id="max_emails_per_run")
+            yield Static("", id="mailbox_error", classes="error")
             yield Button("Continue", id="continue", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id != "continue":
             return
+        host = self.query_one("#host", Input).value.strip()
+        if not host:
+            self.query_one("#mailbox_error", Static).update("IMAP host is required, e.g. imap.gmail.com -- see the README's IMAP section.")
+            return
         self.dismiss(
             MailboxConfig(
-                host=self.query_one("#host", Input).value.strip(),
+                host=host,
                 port=int(self.query_one("#port", Input).value or 993),
                 username=self._mailbox.username,
                 password=self._mailbox.password,

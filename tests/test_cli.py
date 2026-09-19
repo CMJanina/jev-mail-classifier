@@ -106,6 +106,32 @@ def test_cmd_run_reports_config_error(monkeypatch, capsys):
     assert "no config file" in capsys.readouterr().err
 
 
+def test_cmd_run_reports_connection_error_not_a_traceback(monkeypatch, capsys):
+    monkeypatch.setattr(cli, "load_config", lambda *a, **k: _config())
+    monkeypatch.setattr(cli, "get_jev_client", lambda *a, **k: MagicMock())
+
+    class FakeMailbox:
+        def __init__(self, mailbox_config):
+            pass
+
+        def __enter__(self):
+            raise ConnectionRefusedError("[Errno 61] Connection refused")
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(cli, "Mailbox", FakeMailbox)
+    args = cli.build_parser().parse_args(["run"])
+    args.dir = "."
+
+    exit_code = cli.cmd_run(args)
+
+    err = capsys.readouterr().err
+    assert exit_code == 1
+    assert "Traceback" not in err
+    assert "imap.example.com" in err
+
+
 def test_main_auto_launches_configure_when_no_config(monkeypatch, tmp_path):
     called = {}
     monkeypatch.setattr(cli, "cmd_configure", lambda args: called.setdefault("cmd", "configure") or 0)

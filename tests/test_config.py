@@ -60,6 +60,13 @@ def test_load_config_max_emails_per_run_defaults_and_overrides(tmp_path):
     assert config.mailbox.max_emails_per_run == 5
 
 
+def test_load_config_empty_host_raises(tmp_path):
+    config_path = tmp_path / "config.yaml"
+    config_path.write_text("mailbox:\n  host: ''\ncategories:\n  spam:\n    description: spam\n    actions: []\n")
+    with pytest.raises(ConfigError):
+        load_config(config_path, env_path=tmp_path / "does-not-exist.env")
+
+
 def test_load_config_missing_env_var_raises(tmp_path):
     config_path = tmp_path / "config.yaml"
     config_path.write_text(

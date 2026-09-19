@@ -18,6 +18,10 @@ CSS = """
     color: $text-muted;
     padding: 1 0;
 }
+.error {
+    color: red;
+    padding: 1 0;
+}
 """
 
 

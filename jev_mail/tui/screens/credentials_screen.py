@@ -7,7 +7,8 @@ from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Input, Label, Static
 
-from jev_mail.config import read_env, save_env
+from jev_mail.config import JevSettings, read_env, save_env
+from jev_mail.providers import ProviderError, get_jev_client
 
 
 class CredentialsScreen(Screen[None]):
@@ -35,6 +36,8 @@ class CredentialsScreen(Screen[None]):
             yield Input(value=existing.get("OPENROUTER_API_KEY", ""), placeholder="OPENROUTER_API_KEY", password=True, id="openrouter_key")
             yield Label("Vercel AI Gateway key")
             yield Input(value=existing.get("AI_GATEWAY_API_KEY", ""), placeholder="AI_GATEWAY_API_KEY", password=True, id="vercel_key")
+            yield Button("Test key", id="test_key")
+            yield Static("", id="key_test_status")
             yield Label("IMAP username")
             yield Input(value=existing.get("IMAP_USERNAME", ""), placeholder="you@example.com", id="imap_username")
             yield Label("IMAP password (NOT your regular password if 2FA is on -- see below)")
@@ -49,6 +52,10 @@ class CredentialsScreen(Screen[None]):
             yield Button("Continue", id="continue", variant="primary")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "test_key":
+            self.query_one("#key_test_status", Static).update("Testing...")
+            self._test_worker = self.run_worker(self._test_key, thread=True)
+            return
         if event.button.id != "continue":
             return
         save_env(
@@ -62,3 +69,20 @@ class CredentialsScreen(Screen[None]):
             self._env_path,
         )
         self.dismiss(None)
+
+    def _test_key(self) -> None:
+        """Runs on a worker thread (network call) -- a cheap, real Jev call
+        to confirm whichever key is filled in actually authenticates."""
+        status = self.query_one("#key_test_status", Static)
+        env = {
+            "TYPESAFE_API_KEY": self.query_one("#typesafe_key", Input).value.strip(),
+            "OPENROUTER_API_KEY": self.query_one("#openrouter_key", Input).value.strip(),
+            "AI_GATEWAY_API_KEY": self.query_one("#vercel_key", Input).value.strip(),
+        }
+        try:
+            client = get_jev_client(JevSettings(provider="auto"), env=env)
+            client.decide("connectivity check", {"ok": "This is always true."})
+        except ProviderError as exc:
+            self.app.call_from_thread(status.update, f"[red]✗ {exc}[/red]")
+        else:
+            self.app.call_from_thread(status.update, "[green]✓ Key works[/green]")

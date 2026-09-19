@@ -106,6 +106,8 @@ def load_config(config_path: str | Path, env_path: str | Path | None = None) -> 
         poll_interval_seconds=int(mb_raw.get("poll_interval_seconds", 60)),
         max_emails_per_run=int(mb_raw.get("max_emails_per_run", 25)),
     )
+    if not mailbox.host:
+        raise ConfigError("mailbox.host is empty — run `jev-mail configure` and fill in the IMAP host")
 
     jev_raw = raw.get("jev", {})
     jev = JevSettings(
