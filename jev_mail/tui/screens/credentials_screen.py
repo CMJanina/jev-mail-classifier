@@ -94,6 +94,15 @@ class CredentialsScreen(Screen[None]):
             client = get_jev_client(JevSettings(provider="auto"), env=env)
             client.decide("connectivity check", {"ok": "This is always true."})
         except ProviderError as exc:
-            self.app.call_from_thread(status.update, f"[red]✗ {exc}[/red]")
+            self.app.call_from_thread(self._set_key_test_status, status, f"✗ {exc}", "error")
         else:
-            self.app.call_from_thread(status.update, "[green]✓ Key works[/green]")
+            self.app.call_from_thread(self._set_key_test_status, status, "✓ Key works", "success")
+
+    @staticmethod
+    def _set_key_test_status(status: Static, text: str, css_class: str) -> None:
+        """Uses theme tokens ($success/$error) via a CSS class rather than a
+        hardcoded Rich color -- so this reads correctly in any theme, not
+        just ones where plain 'green'/'red' happen to look right."""
+        status.remove_class("success", "error")
+        status.add_class(css_class)
+        status.update(text)

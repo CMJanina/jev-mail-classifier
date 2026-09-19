@@ -70,6 +70,12 @@ VerticalScroll, ListView {
     padding: 1 0;
 }
 
+.success {
+    color: $success;
+    text-style: bold;
+    padding: 1 0;
+}
+
 .field-label {
     color: $text-muted;
     padding: 1 0 0 0;
