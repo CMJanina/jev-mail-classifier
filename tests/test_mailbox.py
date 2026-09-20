@@ -27,29 +27,29 @@ def test_fetch_unprocessed_parses_subject_and_body():
     assert "World" in emails[0].body
 
 
-def test_fetch_unprocessed_respects_limit():
+def test_fetch_unprocessed_sorts_newest_first_before_limit():
+    """IMAP UIDs increase with arrival and SEARCH returns them ascending
+    (oldest first) -- a capped run must still pick up the newest mail, not
+    get stuck on the oldest end of a big backlog."""
     fake_server = MagicMock()
     fake_server.search.return_value = [1, 2, 3, 4, 5]
-    fake_server.fetch.return_value = {
-        1: {b"RFC822": _raw_message("One", "body")},
-        2: {b"RFC822": _raw_message("Two", "body")},
-    }
+    fake_server.fetch.return_value = {}
 
     with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server) as mailbox:
         mailbox.fetch_unprocessed(limit=2)
 
-    fake_server.fetch.assert_called_once_with([1, 2], ["RFC822"])
+    fake_server.fetch.assert_called_once_with([5, 4], ["RFC822"])
 
 
-def test_fetch_unprocessed_no_limit_fetches_all():
+def test_fetch_unprocessed_no_limit_still_sorts_newest_first():
     fake_server = MagicMock()
-    fake_server.search.return_value = [1, 2, 3]
+    fake_server.search.return_value = [1, 3, 2]
     fake_server.fetch.return_value = {}
 
     with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server) as mailbox:
         mailbox.fetch_unprocessed()
 
-    fake_server.fetch.assert_called_once_with([1, 2, 3], ["RFC822"])
+    fake_server.fetch.assert_called_once_with([3, 2, 1], ["RFC822"])
 
 
 def test_fetch_unprocessed_returns_empty_when_no_uids():

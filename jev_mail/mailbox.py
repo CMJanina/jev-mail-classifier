@@ -51,10 +51,16 @@ class Mailbox:
     def fetch_unprocessed(self, limit: int | None = None) -> list[Email]:
         """`limit` caps how many messages get fetched+classified in one call
         -- keeps a single run/poll bounded (cost, rate limits, one huge
-        backlog) instead of processing an entire inbox at once."""
+        backlog) instead of processing an entire inbox at once.
+
+        IMAP UIDs increase monotonically with arrival, and SEARCH returns
+        them in ascending order -- sort descending so a capped run picks up
+        the newest unprocessed mail first, not whatever's oldest in a big
+        backlog."""
         uids = self._server.search(["UNKEYWORD", PROCESSED_KEYWORD])
         if not uids:
             return []
+        uids = sorted(uids, reverse=True)
         if limit is not None:
             uids = uids[:limit]
         response = self._server.fetch(uids, ["RFC822"])

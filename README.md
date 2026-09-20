@@ -35,6 +35,29 @@ that: you send it your inbox state and a set of yes/no questions, and it hands b
 calibrated probabilities directly -- typically in well under a second, for a fraction of
 a cent per email.
 
+### What makes Jev different from calling an LLM
+
+Chat LLMs are trained with RLHF to produce fluent, human-pleasing *text* -- great for
+conversation, but that same optimization is what makes them mode-drop, hedge, and
+overstate confidence when what you actually need is a reliable decision buried inside
+software. Jev is TypeSafe's first **System One model**: instead of generating a
+sentence you have to parse, it's trained with **Reinforcement Learning for Calibrated
+Decisions (RLCD)** to output typed, calibrated probabilities directly -- "more like
+code: reliable, fast, self-consistent, and type-safe" than like a chatbot reply.
+
+That shows up as a very different cost and latency profile for exactly the kind of
+question `jev-mail-classifier` asks per email ("is this an invoice, yes or no"):
+
+- **~193x faster** than a general-purpose LLM on this class of task
+- **~238x cheaper** per token than Claude ($42 per billion input tokens)
+- In TypeSafe's own benchmark, an equivalent workflow ran in **0.114s for $0.000081**
+  on Jev vs. **8.566s for $0.014** on an LLM
+
+Because the output is a calibrated probability rather than free text, you also get a
+knob a chat completion doesn't give you for free: a **threshold per category**. Set
+`urgent` to fire at `0.7` and `spam` at `0.9`, and Jev's own confidence -- not a second
+prompt asking "are you sure?" -- decides whether an action runs.
+
 **jev-mail-classifier** wraps that in something you can actually run against a real
 mailbox: connect over IMAP, define categories in plain language, and let each category
 tag, move, flag, or ping a webhook -- all from a terminal UI, no code required.
@@ -168,6 +191,8 @@ categories:
 classified in a single `run` or poll cycle -- protects against a huge backlog burning
 through your Jev quota or a run taking forever the first time you point this at a real
 inbox. If a run hits the cap, it prints a notice and picks up the rest next time.
+"Unprocessed" means missing the `$JevProcessed` keyword, not `\Seen`/unread -- opening
+an email doesn't skip it. When capped, the newest unprocessed mail is classified first.
 
 | Action        | What it does                                   |
 | ------------- | ----------------------------------------------- |
