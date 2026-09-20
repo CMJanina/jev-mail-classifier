@@ -18,9 +18,7 @@
 
 *Tag, move, flag, and notify -- no LLM prompt engineering, no JSON parsing, no per-email API bill that adds up.*
 
-[![jev-mail-classifier demo](media/brag.gif)](media/brag.mp4)
-
-*(GIF preview above -- [watch the full clip with sound](media/brag.mp4))*
+https://github.com/user-attachments/assets/4604d2ff-6e59-4938-983e-305d355be5d2
 
 </div>
 
