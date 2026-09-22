@@ -37,12 +37,6 @@ class CategoryEditScreen(Screen[Category | None]):
 
                 yield Checkbox("Move to folder", value="move" in actions_by_type, id="cb_move")
                 yield Input(value=actions_by_type.get("move", Action(type="move")).folder or "", placeholder="folder name", id="move_folder")
-
-                yield Checkbox("Flag (star)", value="flag" in actions_by_type, id="cb_flag")
-                yield Checkbox("Mark read", value="mark_read" in actions_by_type, id="cb_mark_read")
-
-                yield Checkbox("Webhook", value="webhook" in actions_by_type, id="cb_webhook")
-                yield Input(value=actions_by_type.get("webhook", Action(type="webhook")).url or "", placeholder="https://hooks.slack.com/...", id="webhook_url")
             with Horizontal(classes="actions-dock"):
                 yield Button("Save", id="save", variant="primary")
                 yield Button("Cancel", id="cancel")
@@ -64,12 +58,6 @@ class CategoryEditScreen(Screen[Category | None]):
             actions.append(Action(type="tag", value=value))
         if self.query_one("#cb_move", Checkbox).value:
             actions.append(Action(type="move", folder=self.query_one("#move_folder", Input).value.strip()))
-        if self.query_one("#cb_flag", Checkbox).value:
-            actions.append(Action(type="flag"))
-        if self.query_one("#cb_mark_read", Checkbox).value:
-            actions.append(Action(type="mark_read"))
-        if self.query_one("#cb_webhook", Checkbox).value:
-            actions.append(Action(type="webhook", url=self.query_one("#webhook_url", Input).value.strip()))
 
         threshold_raw = self.query_one("#threshold", Input).value.strip()
         self.dismiss(

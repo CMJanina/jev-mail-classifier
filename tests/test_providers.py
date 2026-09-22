@@ -6,7 +6,6 @@ from jev_mail.providers import ProviderError, get_jev_client
 from jev_mail.providers.base import describe_http_error
 from jev_mail.providers.openrouter import OpenRouterJevClient
 from jev_mail.providers.typesafe_direct import TypeSafeDirectClient
-from jev_mail.providers.vercel_gateway import VercelGatewayJevClient
 
 
 def _fake_response(json_body: dict, status_code: int = 200) -> httpx.Response:
@@ -17,10 +16,10 @@ CATEGORIES = {"invoice": "Invoice or billing", "urgent": "Time-sensitive"}
 
 
 @pytest.mark.parametrize(
-    "client_cls,answer_key",
-    [(OpenRouterJevClient, "noul"), (TypeSafeDirectClient, "noul"), (VercelGatewayJevClient, "boolean")],
+    "client_cls",
+    [OpenRouterJevClient, TypeSafeDirectClient],
 )
-def test_decide_normalizes_probabilities(monkeypatch, client_cls, answer_key):
+def test_decide_normalizes_probabilities(monkeypatch, client_cls):
     captured = {}
 
     def fake_post(url, headers=None, json=None, timeout=None):
@@ -29,8 +28,8 @@ def test_decide_normalizes_probabilities(monkeypatch, client_cls, answer_key):
         return _fake_response(
             {
                 "answers": {
-                    "invoice": {"type": answer_key, answer_key: 0.9},
-                    "urgent": {"type": answer_key, answer_key: 0.2},
+                    "invoice": {"type": "noul", "noul": 0.9},
+                    "urgent": {"type": "noul", "noul": 0.2},
                 }
             }
         )
@@ -92,17 +91,13 @@ def test_decide_raises_provider_error_on_missing_answer(monkeypatch):
 
 
 def test_get_jev_client_auto_detect_priority(monkeypatch):
-    env = {"OPENROUTER_API_KEY": "or-key", "AI_GATEWAY_API_KEY": "vck-key"}
+    env = {"OPENROUTER_API_KEY": "or-key"}
     client = get_jev_client(JevSettings(provider="auto"), env=env)
     assert isinstance(client, OpenRouterJevClient)
 
     env = {"TYPESAFE_API_KEY": "ts-key", "OPENROUTER_API_KEY": "or-key"}
     client = get_jev_client(JevSettings(provider="auto"), env=env)
     assert isinstance(client, TypeSafeDirectClient)
-
-    env = {"AI_GATEWAY_API_KEY": "vck-key"}
-    client = get_jev_client(JevSettings(provider="auto"), env=env)
-    assert isinstance(client, VercelGatewayJevClient)
 
 
 def test_get_jev_client_auto_detect_no_keys_raises():
@@ -112,7 +107,7 @@ def test_get_jev_client_auto_detect_no_keys_raises():
 
 def test_get_jev_client_explicit_provider_missing_key_raises():
     with pytest.raises(ProviderError):
-        get_jev_client(JevSettings(provider="vercel"), env={})
+        get_jev_client(JevSettings(provider="openrouter"), env={})
 
 
 def test_get_jev_client_explicit_provider_unknown_raises():

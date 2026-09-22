@@ -7,9 +7,4 @@ set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [ ! -x "$here/.venv/bin/jev-mail" ]; then
-  echo "Not installed yet -- run ./install.sh first." >&2
-  exit 1
-fi
-
 exec "$here/.venv/bin/jev-mail" --dir "$here" "$@"

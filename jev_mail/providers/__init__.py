@@ -7,13 +7,11 @@ from jev_mail.config import JevSettings
 from .base import JevClient, ProviderError
 from .openrouter import OpenRouterJevClient
 from .typesafe_direct import TypeSafeDirectClient
-from .vercel_gateway import VercelGatewayJevClient
 
 # (provider name, env var, client class), in auto-detect priority order.
 _BACKENDS = (
     ("typesafe", "TYPESAFE_API_KEY", TypeSafeDirectClient),
     ("openrouter", "OPENROUTER_API_KEY", OpenRouterJevClient),
-    ("vercel", "AI_GATEWAY_API_KEY", VercelGatewayJevClient),
 )
 
 __all__ = ["JevClient", "ProviderError", "get_jev_client"]
@@ -28,8 +26,8 @@ def get_jev_client(settings: JevSettings, env: dict | None = None) -> JevClient:
             if api_key:
                 return client_cls(api_key)
         raise ProviderError(
-            "no Jev API key found -- set one of TYPESAFE_API_KEY, OPENROUTER_API_KEY, "
-            "or AI_GATEWAY_API_KEY (run `jev-mail configure` to set one)"
+            "no Jev API key found -- set TYPESAFE_API_KEY or OPENROUTER_API_KEY "
+            "(run `jev-mail configure` to set one)"
         )
 
     for name, env_var, client_cls in _BACKENDS:

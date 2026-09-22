@@ -37,23 +37,14 @@ class CredentialsScreen(Screen[None]):
                 yield Input(value=existing.get("TYPESAFE_API_KEY", ""), placeholder="TYPESAFE_API_KEY", password=True, id="typesafe_key")
                 yield Label("OpenRouter API key", classes="field-label")
                 yield Input(value=existing.get("OPENROUTER_API_KEY", ""), placeholder="OPENROUTER_API_KEY", password=True, id="openrouter_key")
-                yield Label("Vercel AI Gateway key", classes="field-label")
-                yield Input(value=existing.get("AI_GATEWAY_API_KEY", ""), placeholder="AI_GATEWAY_API_KEY", password=True, id="vercel_key")
 
                 yield Button("Test key", id="test_key")
                 yield Static("", id="key_test_status")
 
                 yield Label("IMAP username", classes="field-label")
                 yield Input(value=existing.get("IMAP_USERNAME", ""), placeholder="you@example.com", id="imap_username")
-                yield Label("IMAP password (NOT your regular password if 2FA is on -- see below)", classes="field-label")
-                yield Input(value=existing.get("IMAP_PASSWORD", ""), placeholder="app password", password=True, id="imap_password")
-                yield Static(
-                    "Need an app password? Gmail: myaccount.google.com/apppasswords "
-                    "(enable IMAP first in Gmail Settings -> Forwarding and POP/IMAP). "
-                    "Outlook: account.microsoft.com/security -> App passwords. "
-                    "Full walkthrough: see the README's 'Getting your IMAP username & password' section.",
-                    classes="hint",
-                )
+                yield Label("IMAP password", classes="field-label")
+                yield Input(value=existing.get("IMAP_PASSWORD", ""), placeholder="password", password=True, id="imap_password")
             with Horizontal(classes="actions-dock"):
                 yield Button("Continue", id="continue", variant="primary")
         yield Footer()
@@ -72,7 +63,6 @@ class CredentialsScreen(Screen[None]):
             {
                 "TYPESAFE_API_KEY": self.query_one("#typesafe_key", Input).value,
                 "OPENROUTER_API_KEY": self.query_one("#openrouter_key", Input).value,
-                "AI_GATEWAY_API_KEY": self.query_one("#vercel_key", Input).value,
                 "IMAP_USERNAME": self.query_one("#imap_username", Input).value,
                 "IMAP_PASSWORD": self.query_one("#imap_password", Input).value,
             },
@@ -87,7 +77,6 @@ class CredentialsScreen(Screen[None]):
         env = {
             "TYPESAFE_API_KEY": self.query_one("#typesafe_key", Input).value.strip(),
             "OPENROUTER_API_KEY": self.query_one("#openrouter_key", Input).value.strip(),
-            "AI_GATEWAY_API_KEY": self.query_one("#vercel_key", Input).value.strip(),
         }
         try:
             client = get_jev_client(JevSettings(provider="auto"), env=env)

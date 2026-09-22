@@ -1,7 +1,7 @@
 [project]
 name = "jev-mail-classifier"
 version = "0.1.0"
-description = "Classify your inbox with Jev (TypeSafe's System One model) — tag, move, flag, and notify, all config-driven."
+description = "Classify, tag, and move email with Jev."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

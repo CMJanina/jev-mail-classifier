@@ -27,12 +27,12 @@ class JevClient(Protocol):
         ...
 
 
-def build_noul_questions(categories: dict[str, str], noul_type: str = "noul") -> dict:
+def build_noul_questions(categories: dict[str, str]) -> dict:
     """{category: description} -> the `questions` block Jev expects: one
     yes/no (noul) question per category, phrased from its description."""
     return {
         name: {
-            "type": noul_type,
+            "type": "noul",
             "instructions": f"Does this apply: {description}",
             "criteria": {"true": description, "false": "Does not apply"},
         }
@@ -42,14 +42,13 @@ def build_noul_questions(categories: dict[str, str], noul_type: str = "noul") ->
 
 def extract_probabilities(answers: dict, categories: list[str]) -> dict[str, float]:
     """Normalizes a decisions-style response's `answers` block back to
-    {category: probability}, tolerant of the noul/boolean naming difference
-    between backends."""
+    {category: probability}."""
     result: dict[str, float] = {}
     for name in categories:
         answer = answers.get(name)
         if not isinstance(answer, dict):
             raise ProviderError(f"no answer returned for category {name!r}")
-        probability = answer.get("noul", answer.get("boolean"))
+        probability = answer.get("noul")
         if probability is None:
             raise ProviderError(f"couldn't find a probability in the answer for {name!r}: {answer!r}")
         result[name] = float(probability)

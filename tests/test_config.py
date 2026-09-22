@@ -100,7 +100,7 @@ def test_save_config_never_writes_literal_secrets(tmp_path):
     config = AppConfig(
         mailbox=MailboxConfig(host="imap.example.com", username="me@example.com", password="hunter2"),
         jev=JevSettings(),
-        categories=[Category(name="urgent", description="Urgent", actions=[Action(type="flag")])],
+        categories=[Category(name="urgent", description="Urgent", actions=[Action(type="tag", value="Urgent")])],
     )
     out_path = tmp_path / "config.yaml"
     save_config(config, out_path)

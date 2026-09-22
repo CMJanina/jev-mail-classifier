@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 _VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
-ACTION_TYPES = ("tag", "move", "flag", "unflag", "mark_read", "mark_unread", "webhook")
+ACTION_TYPES = ("tag", "move")
 
 
 class ConfigError(Exception):
@@ -22,13 +22,12 @@ class Action:
     type: str
     value: str | None = None
     folder: str | None = None
-    url: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> "Action":
         if data.get("type") not in ACTION_TYPES:
             raise ConfigError(f"unknown action type: {data.get('type')!r}")
-        return cls(type=data["type"], value=data.get("value"), folder=data.get("folder"), url=data.get("url"))
+        return cls(type=data["type"], value=data.get("value"), folder=data.get("folder"))
 
     def to_dict(self) -> dict:
         out: dict = {"type": self.type}
@@ -36,8 +35,6 @@ class Action:
             out["value"] = self.value
         if self.folder is not None:
             out["folder"] = self.folder
-        if self.url is not None:
-            out["url"] = self.url
         return out
 
 

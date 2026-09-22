@@ -14,7 +14,7 @@ def _config(**category_overrides) -> AppConfig:
                 name="urgent",
                 description="Urgent",
                 threshold=category_overrides.get("urgent_threshold", 0.6),
-                actions=[Action(type="flag")],
+                actions=[Action(type="tag", value="Urgent")],
             ),
         ],
     )

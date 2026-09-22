@@ -13,7 +13,7 @@ mailbox:
   max_emails_per_run: 25 # caps how many unprocessed emails get classified in one run/poll
 
 jev:
-  provider: auto # auto | typesafe | openrouter | vercel
+  provider: auto # auto | typesafe | openrouter
   default_threshold: 0.6
 
 categories:
@@ -29,9 +29,8 @@ categories:
     description: "Time-sensitive, needs action today"
     threshold: 0.7 # overrides jev.default_threshold for this category
     actions:
-      - type: flag
-      - type: webhook
-        url: ${SLACK_WEBHOOK_URL}
+      - type: tag
+        value: Urgent
 
   spam:
     description: "Spam, phishing, or an unsolicited sales pitch"

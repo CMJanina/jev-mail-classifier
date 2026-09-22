@@ -16,7 +16,7 @@
 [![Powered by Jev](https://img.shields.io/badge/powered%20by-Jev-purple)](https://typesafe.ai)
 [![TUI: Textual](https://img.shields.io/badge/TUI-Textual-orange)](https://github.com/textualize/textual)
 
-*Tag, move, flag, and notify -- no LLM prompt engineering, no JSON parsing, no per-email API bill that adds up.*
+*Classify, tag, and move email with Jev.*
 
 https://github.com/user-attachments/assets/4604d2ff-6e59-4938-983e-305d355be5d2
 
@@ -58,7 +58,7 @@ prompt asking "are you sure?" -- decides whether an action runs.
 
 **jev-mail-classifier** wraps that in something you can actually run against a real
 mailbox: connect over IMAP, define categories in plain language, and let each category
-tag, move, flag, or ping a webhook -- all from a terminal UI, no code required.
+tag or move messages. Configure it through the terminal UI.
 
 ## Quickstart
 
@@ -69,8 +69,8 @@ cd jev-mail-classifier
 ```
 
 That's it -- `install.sh` sets up a virtualenv, installs the package, and drops you
-straight into the setup wizard. Paste **one** Jev API key (TypeSafe, OpenRouter, or
-Vercel AI Gateway -- whichever you have), your IMAP login, and start adding categories.
+straight into the setup wizard. Enter a TypeSafe or OpenRouter API key and your
+IMAP login, then add categories.
 
 Once configured, run it with `./jev-mail` from inside the project directory --
 `install.sh` installs into a local `.venv`, and `./jev-mail` is a small wrapper that
@@ -90,38 +90,6 @@ saved (masked) rather than blank fields.
 > **Coming soon:** `pipx install jev-mail-classifier` -- for now, `install.sh` after
 > cloning is the whole setup.
 
-## Getting your IMAP username & password
-
-The wizard asks for these on the first screen. "Username" is just your email address;
-"password" is where people get stuck, because **if your account has 2-factor
-authentication on, your normal login password will not work over IMAP** -- you need a
-separate *app password* instead.
-
-**Gmail**
-1. Turn on IMAP: Gmail Settings (gear icon) -> **See all settings** -> **Forwarding and
-   POP/IMAP** tab -> enable IMAP -> Save.
-2. Create an app password: go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
-   (requires 2-Step Verification to be on -- turn it on first if it isn't). Name it
-   anything (e.g. "jev-mail"), copy the 16-character password it gives you.
-3. Use your full Gmail address as the username, and that 16-character code as the
-   password. Host: `imap.gmail.com`, port `993`.
-
-**Outlook / Microsoft 365**
-1. Go to [account.microsoft.com/security](https://account.microsoft.com/security) ->
-   **Advanced security options** -> **App passwords** -> create one.
-2. Username is your full email address, password is the app password. Host:
-   `outlook.office365.com`, port `993`.
-
-**Yahoo Mail**
-1. Account Info -> **Account Security** -> turn on 2-step verification -> **Generate
-   app password**. Host: `imap.mail.yahoo.com`, port `993`.
-
-**Any other provider**
-Look for "IMAP settings" in your provider's account/security settings -- you need the
-IMAP host and port (almost always `993`), and, if 2FA is on, an app-specific password
-generated the same way. If 2FA is off, your regular email password usually works, but
-an app password is safer since it can be revoked without changing your main password.
-
 ## What it looks like
 
 `jev-mail configure` is a three-step terminal UI:
@@ -133,24 +101,21 @@ an app password is safer since it can be revoked without changing your main pass
    `a` add &middot; `e` edit &middot; `d` delete &middot; `s` save & exit
 
 <p align="center">
-  <img src="media/screenshots/tui-1-credentials.png" alt="Credentials screen: paste one Jev key and your IMAP login" width="49%">
   <img src="media/screenshots/tui-2-mailbox.png" alt="Mailbox screen: IMAP host, port, folder, poll interval" width="49%">
 </p>
 <p align="center">
   <img src="media/screenshots/tui-3-categories.png" alt="Categories screen: live list of configured categories" width="49%">
-  <img src="media/screenshots/tui-4-category-edit.png" alt="Edit category screen: description plus a checklist of actions" width="49%">
 </p>
 
-Each category is a plain-language description plus a checklist of actions -- tag, move,
-flag, mark read, or hit a webhook -- no YAML syntax to remember.
+Each category has a description and actions to tag or move matching messages.
 
 ## How it works
 
 ```
    IMAP inbox                    Jev                      your mailbox
  ┌──────────────┐   subject+body   ┌───────────┐   probabilities   ┌──────────────┐
- │  unprocessed │ ───────────────► │  one call, │ ────────────────► │ tag / move / │
- │    email     │                  │ one yes/no │                    │ flag / hook  │
+ │  unprocessed │ ───────────────► │  one call, │ ────────────────► │ tag / move   │
+ │    email     │                  │ one yes/no │                    │              │
  │              │ ◄─────────────── │  question  │ ◄──────────────── │              │
  └──────────────┘   marked          │ per category│    threshold      └──────────────┘
                      processed       └───────────┘     per category
@@ -180,9 +145,8 @@ categories:
     description: "Time-sensitive, needs action today"
     threshold: 0.7
     actions:
-      - type: flag
-      - type: webhook
-        url: ${SLACK_WEBHOOK_URL}
+      - type: tag
+        value: Urgent
 ```
 
 `mailbox.max_emails_per_run` (default `25`) caps how many unprocessed emails get
@@ -196,13 +160,8 @@ an email doesn't skip it. When capped, the newest unprocessed mail is classified
 | ------------- | ----------------------------------------------- |
 | `tag`         | Adds a custom IMAP keyword to the message        |
 | `move`        | Moves the message to another folder (creates it if missing) |
-| `flag`        | Sets the `\Flagged` (star) system flag           |
-| `unflag`      | Clears it                                        |
-| `mark_read`   | Sets `\Seen`                                     |
-| `mark_unread` | Clears it                                        |
-| `webhook`     | `POST`s `{category, probability, subject}` to a URL |
 
-## Three ways to power it
+## Two ways to power it
 
 Set **one** of these in `.env` (the wizard writes it for you) -- checked in this order:
 
@@ -210,14 +169,11 @@ Set **one** of these in `.env` (the wizard writes it for you) -- checked in this
 | -------- | ---------------------- | ------------------------------------------ |
 | 1        | `TYPESAFE_API_KEY`     | TypeSafe's own API, direct                  |
 | 2        | `OPENROUTER_API_KEY`   | Via OpenRouter's Decisions endpoint         |
-| 3        | `AI_GATEWAY_API_KEY`   | Via Vercel AI Gateway                       |
 
 Or set `jev.provider` in `config.yaml` to pin one explicitly instead of auto-detecting.
 
-> The OpenRouter path is live-verified. The TypeSafe-direct and Vercel-gateway adapters
-> are built from their published docs but not yet tested against a live key -- if one of
-> those breaks for you, `jev_mail/providers/` is the one place to look, and pull
-> requests are very welcome.
+> The OpenRouter adapter has been tested with a live key. The TypeSafe adapter
+> follows its published docs but has not been tested with a live key.
 
 ## Development
 

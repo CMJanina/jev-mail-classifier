@@ -39,7 +39,7 @@ def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig,
                 if dry_run:
                     print(f"[dry-run] {mail.subject!r}: {category.name} ({probability:.2f}) -> {action.type}")
                 else:
-                    run_action(mailbox, mail, action, category.name, probability)
+                    run_action(mailbox, mail, action)
 
         # Mark processed even when nothing matched -- otherwise a never-matching
         # email gets reclassified (and re-billed) on every future run.
