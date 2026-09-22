@@ -9,7 +9,7 @@ from jev_mail.mailbox import Email
 
 def _config() -> AppConfig:
     return AppConfig(
-        mailbox=MailboxConfig(host="imap.example.com"),
+        accounts={"default": MailboxConfig(host="imap.example.com")},
         jev=JevSettings(default_threshold=0.6),
         categories=[Category(name="invoice", description="Invoice", actions=[Action(type="tag", value="Invoice")])],
     )
@@ -37,8 +37,8 @@ def test_process_unprocessed_passes_limit_to_fetch():
     client = MagicMock()
 
     config = _config()
-    config.mailbox.max_emails_per_run = 7
-    cli._process_unprocessed(mailbox, client, config, dry_run=False)
+    config.accounts["default"].max_emails_per_run = 7
+    cli._process_unprocessed(mailbox, client, config, dry_run=False, limit=config.accounts["default"].max_emails_per_run)
 
     mailbox.fetch_unprocessed.assert_called_once_with(limit=7)
 
@@ -50,8 +50,8 @@ def test_process_unprocessed_warns_when_limit_is_hit(capsys):
     client.decide.return_value = {"invoice": 0.9}
 
     config = _config()
-    config.mailbox.max_emails_per_run = 1
-    cli._process_unprocessed(mailbox, client, config, dry_run=False)
+    config.accounts["default"].max_emails_per_run = 1
+    cli._process_unprocessed(mailbox, client, config, dry_run=False, limit=config.accounts["default"].max_emails_per_run)
 
     assert "max_emails_per_run" in capsys.readouterr().out
 
@@ -193,3 +193,63 @@ def test_move_preserves_all_tags_and_processed_flag(destination, dry_run, capsys
         server.move.assert_called_once_with([1], "Invoices")
     if destination != "Invoices":
         assert "conflicting move destinations" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("command", ["run", "watch"])
+@pytest.mark.parametrize("selection", [[], ["--account", "typo"]])
+def test_multiple_accounts_require_valid_selection(tmp_path, monkeypatch, capsys, command, selection):
+    from jev_mail.config import save_config
+
+    config = _config()
+    config.accounts["work"] = MailboxConfig("imap.work.test")
+    save_config(config, tmp_path / "config.yaml")
+    mailbox = MagicMock()
+    monkeypatch.setattr(cli, "Mailbox", mailbox)
+    args = cli.build_parser().parse_args(["--dir", str(tmp_path), command, *selection])
+    assert getattr(cli, f"cmd_{command}")(args) == 1
+    assert "available accounts: default, work" in capsys.readouterr().err
+    mailbox.assert_not_called()
+
+
+def test_run_selected_account_uses_its_credentials_and_limit(tmp_path, monkeypatch):
+    from jev_mail.config import save_config
+
+    config = _config()
+    config.accounts["work"] = MailboxConfig("imap.work.test", username="work", password="secret", max_emails_per_run=3)
+    config.jev.openrouter_api_key = "config-key"
+    save_config(config, tmp_path / "config.yaml")
+    mailbox = MagicMock()
+    mailbox.return_value.__enter__.return_value.fetch_unprocessed.return_value = []
+    monkeypatch.setattr(cli, "Mailbox", mailbox)
+    args = cli.build_parser().parse_args(["--dir", str(tmp_path), "run", "--account", "work", "--dry-run"])
+    assert cli.cmd_run(args) == 0
+    mailbox.assert_called_once_with(config.accounts["work"], readonly=True)
+    mailbox.return_value.__enter__.return_value.fetch_unprocessed.assert_called_once_with(limit=3)
+
+
+def test_configure_adds_account_without_losing_existing_config(tmp_path, monkeypatch):
+    from jev_mail.config import save_config, load_config
+    from jev_mail.tui import app
+
+    config = _config()
+    save_config(config, tmp_path / "config.yaml")
+    wizard = MagicMock()
+    monkeypatch.setattr(app, "JevMailConfigApp", wizard)
+    args = cli.build_parser().parse_args(["--dir", str(tmp_path), "configure", "--account", "work"])
+    assert cli.cmd_configure(args) == 0
+    path, edited, name = wizard.call_args.args
+    assert name == "work"
+    assert edited.accounts["default"] == config.accounts["default"]
+    assert edited.categories == config.categories
+    assert "work" in edited.accounts
+    assert load_config(path) == config  # Nothing is written until the wizard saves.
+
+
+def test_configure_does_not_overwrite_legacy_config(tmp_path, capsys):
+    path = tmp_path / "config.yaml"
+    original = "mailbox:\n  host: imap.test\n"
+    path.write_text(original)
+    args = cli.build_parser().parse_args(["--dir", str(tmp_path), "configure"])
+    assert cli.cmd_configure(args) == 1
+    assert "old config format" in capsys.readouterr().err
+    assert path.read_text() == original

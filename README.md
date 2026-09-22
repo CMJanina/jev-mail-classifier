@@ -95,7 +95,7 @@ saved (masked) rather than blank fields.
 `jev-mail configure` is a three-step terminal UI:
 
 1. **Credentials** -- paste your Jev key and IMAP login (masked input, written straight
-   to a git-ignored `.env` -- you never hand-edit a config file for secrets)
+   to the git-ignored `config.yaml` when you save the wizard)
 2. **Mailbox** -- host, port, folder to watch, poll interval
 3. **Categories** -- a live list you manage with single keystrokes:
    `a` add &middot; `e` edit &middot; `d` delete &middot; `s` save & exit
@@ -154,7 +154,7 @@ categories:
         value: Urgent
 ```
 
-`mailbox.max_emails_per_run` (default `25`) caps how many unprocessed emails get
+`accounts.<name>.max_emails_per_run` (default `25`) caps how many unprocessed emails get
 classified in a single `run` or poll cycle -- protects against a huge backlog burning
 through your Jev quota or a run taking forever the first time you point this at a real
 inbox. If a run hits the cap, it prints a notice and picks up the rest next time.
@@ -166,19 +166,48 @@ an email doesn't skip it. When capped, the newest unprocessed mail is classified
 | `tag`         | Adds a custom IMAP keyword to the message        |
 | `move`        | Moves the message to another folder (creates it if missing) |
 
+## Multiple accounts
+
+Keep named accounts in one `config.yaml`. Each account has its own IMAP login,
+server, folder, and run limit. All accounts share categories and Jev settings.
+
+```bash
+./jev-mail configure --account personal
+./jev-mail configure --account work
+./jev-mail run --account personal
+./jev-mail run --account work --dry-run
+./jev-mail watch --account work
+```
+
+`configure --account NAME` creates or edits that account and preserves the others.
+The wizard also edits the shared API keys and categories. With one account,
+`--account` is optional. With several, you must choose one.
+
+See [`config.example.yaml`](config.example.yaml) for the full format. Credentials
+are literal YAML strings, with no environment variable expansion. Quote passwords,
+especially if they contain YAML punctuation or look like numbers. The wizard saves
+`config.yaml` with owner-only read/write permissions, mode `0600`.
+
 ## Two ways to power it
 
-Set **one** of these in `.env` (the wizard writes it for you) -- checked in this order:
+Set `jev.typesafe_api_key` or `jev.openrouter_api_key` in `config.yaml`, or enter
+one in the wizard. With `jev.provider: auto`, TypeSafe takes priority when both
+keys are present. Set `jev.provider` to `typesafe` or `openrouter` to choose explicitly.
 
-| Priority | Env var               | Backend                                   |
-| -------- | ---------------------- | ------------------------------------------ |
-| 1        | `TYPESAFE_API_KEY`     | TypeSafe's own API, direct                  |
-| 2        | `OPENROUTER_API_KEY`   | Via OpenRouter's Decisions endpoint         |
+The OpenRouter adapter has been tested with a live key. The TypeSafe adapter
+follows its published docs but has not been tested with a live key.
 
-Or set `jev.provider` in `config.yaml` to pin one explicitly instead of auto-detecting.
+## Migrating an existing config
 
-> The OpenRouter adapter has been tested with a live key. The TypeSafe adapter
-> follows its published docs but has not been tested with a live key.
+The old `mailbox` format and `.env` loading are no longer supported.
+
+1. Move the existing `mailbox` settings under `accounts.personal`.
+2. Replace `${IMAP_USERNAME}` and `${IMAP_PASSWORD}` with the actual values from `.env`.
+3. Copy the API key into `jev.typesafe_api_key` or `jev.openrouter_api_key`.
+4. Keep `categories` at the top level, then run `chmod 600 config.yaml`.
+5. Remove `.env` after copying its values. Add other accounts with `./jev-mail configure --account work`.
+
+An old config produces a migration error. The tool leaves it untouched.
 
 ## Development
 

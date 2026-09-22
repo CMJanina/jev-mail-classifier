@@ -1,50 +1,39 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
-from jev_mail.config import JevSettings, read_env, save_env
+from jev_mail.config import JevSettings, MailboxConfig
 from jev_mail.providers import ProviderError, get_jev_client
 
 
 class CredentialsScreen(Screen[None]):
-    """First screen: paste one Jev key and IMAP login. Writes straight to
-    .env -- nothing here ever needs to be typed into config.yaml by hand.
-    Pre-fills from any existing .env so re-running `configure` doesn't look
-    like it forgot everything -- values are just shown masked, like a saved
-    login form, and only overwritten if you actually change them."""
-
-    def __init__(self, env_path: Path):
+    def __init__(self, settings: JevSettings, mailbox: MailboxConfig):
         super().__init__()
-        self._env_path = env_path
-        self._existing = read_env(env_path)
+        self._settings = settings
+        self._mailbox = mailbox
 
     def compose(self) -> ComposeResult:
-        existing = self._existing
         yield Header()
         with Container(id="panel"):
             with VerticalScroll():
                 yield Static("✉  Credentials", classes="title")
-                yield Static("Step 1 of 3 -- paste ONE Jev key (whichever you have) and your IMAP login.", classes="subtitle")
-                if existing:
-                    yield Static("Already configured -- shown pre-filled below. Edit only what you want to change.", classes="hint")
+                yield Static("Step 1 of 3 -- API keys are shared across accounts. IMAP login is for this account.", classes="subtitle")
 
                 yield Label("TypeSafe API key", classes="field-label")
-                yield Input(value=existing.get("TYPESAFE_API_KEY", ""), placeholder="TYPESAFE_API_KEY", password=True, id="typesafe_key")
+                yield Input(value=self._settings.typesafe_api_key, placeholder="TypeSafe API key", password=True, id="typesafe_key")
                 yield Label("OpenRouter API key", classes="field-label")
-                yield Input(value=existing.get("OPENROUTER_API_KEY", ""), placeholder="OPENROUTER_API_KEY", password=True, id="openrouter_key")
+                yield Input(value=self._settings.openrouter_api_key, placeholder="OpenRouter API key", password=True, id="openrouter_key")
 
                 yield Button("Test key", id="test_key")
                 yield Static("", id="key_test_status")
 
                 yield Label("IMAP username", classes="field-label")
-                yield Input(value=existing.get("IMAP_USERNAME", ""), placeholder="you@example.com", id="imap_username")
+                yield Input(value=self._mailbox.username, placeholder="you@example.com", id="imap_username")
                 yield Label("IMAP password", classes="field-label")
-                yield Input(value=existing.get("IMAP_PASSWORD", ""), placeholder="password", password=True, id="imap_password")
+                yield Input(value=self._mailbox.password, placeholder="password", password=True, id="imap_password")
             with Horizontal(classes="actions-dock"):
                 yield Button("Continue", id="continue", variant="primary")
         yield Footer()
@@ -59,27 +48,23 @@ class CredentialsScreen(Screen[None]):
             return
         if event.button.id != "continue":
             return
-        save_env(
-            {
-                "TYPESAFE_API_KEY": self.query_one("#typesafe_key", Input).value,
-                "OPENROUTER_API_KEY": self.query_one("#openrouter_key", Input).value,
-                "IMAP_USERNAME": self.query_one("#imap_username", Input).value,
-                "IMAP_PASSWORD": self.query_one("#imap_password", Input).value,
-            },
-            self._env_path,
-        )
+        self._settings.typesafe_api_key = self.query_one("#typesafe_key", Input).value.strip()
+        self._settings.openrouter_api_key = self.query_one("#openrouter_key", Input).value.strip()
+        self._mailbox.username = self.query_one("#imap_username", Input).value
+        self._mailbox.password = self.query_one("#imap_password", Input).value
         self.dismiss(None)
 
     def _test_key(self) -> None:
         """Runs on a worker thread (network call) -- a cheap, real Jev call
         to confirm whichever key is filled in actually authenticates."""
         status = self.query_one("#key_test_status", Static)
-        env = {
-            "TYPESAFE_API_KEY": self.query_one("#typesafe_key", Input).value.strip(),
-            "OPENROUTER_API_KEY": self.query_one("#openrouter_key", Input).value.strip(),
-        }
+        settings = JevSettings(
+            provider=self._settings.provider,
+            typesafe_api_key=self.query_one("#typesafe_key", Input).value.strip(),
+            openrouter_api_key=self.query_one("#openrouter_key", Input).value.strip(),
+        )
         try:
-            client = get_jev_client(JevSettings(provider="auto"), env=env)
+            client = get_jev_client(settings)
             client.decide("connectivity check", {"ok": "This is always true."})
         except ProviderError as exc:
             self.app.call_from_thread(self._set_key_test_status, status, f"✗ {exc}", "error")

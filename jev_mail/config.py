@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import os
-import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
 import yaml
-from dotenv import dotenv_values, load_dotenv, set_key, unset_key
-
-_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 ACTION_TYPES = ("tag", "move")
 
@@ -68,94 +64,95 @@ class MailboxConfig:
     poll_interval_seconds: int = 60
     max_emails_per_run: int = 25
 
+    def validate_numbers(self) -> None:
+        for key in ("port", "poll_interval_seconds", "max_emails_per_run"):
+            value = getattr(self, key)
+            if type(value) is not int or value <= 0:
+                raise ConfigError(f"{key} must be a positive integer")
+
 
 @dataclass
 class JevSettings:
     provider: str = "auto"
     default_threshold: float = 0.6
+    typesafe_api_key: str = ""
+    openrouter_api_key: str = ""
 
 
 @dataclass
 class AppConfig:
-    mailbox: MailboxConfig
+    accounts: dict[str, MailboxConfig]
     jev: JevSettings
     categories: list[Category]
 
     def category_threshold(self, category: Category) -> float:
         return category.threshold if category.threshold is not None else self.jev.default_threshold
 
+    def account_name(self, name: str | None) -> str:
+        if name is not None and name in self.accounts:
+            return name
+        if name is None and len(self.accounts) == 1:
+            return next(iter(self.accounts))
+        available = ", ".join(self.accounts) or "none"
+        if name is not None:
+            raise ConfigError(f"unknown account {name!r}; available accounts: {available}")
+        raise ConfigError(f"choose an account with --account NAME; available accounts: {available}")
 
-def _interpolate(value: str, env: dict) -> str:
-    def repl(match: re.Match) -> str:
-        var = match.group(1)
-        if var not in env:
-            raise ConfigError(f"config references ${{{var}}} but it isn't set (check your .env)")
-        return env[var]
 
-    return _VAR_PATTERN.sub(repl, value) if isinstance(value, str) else value
-
-
-def load_config(config_path: str | Path, env_path: str | Path | None = None) -> AppConfig:
+def load_config(config_path: str | Path) -> AppConfig:
     config_path = Path(config_path)
-    load_dotenv(env_path or config_path.parent / ".env", override=False)
-
     if not config_path.exists():
-        raise ConfigError(f"no config file at {config_path} — run `jev-mail configure` first")
+        raise ConfigError(f"no config file at {config_path}; run `jev-mail configure` first")
+    try:
+        raw = yaml.safe_load(config_path.read_text())
+        if not isinstance(raw, dict):
+            raise ConfigError("config.yaml must contain a mapping")
+        if "mailbox" in raw:
+            raise ConfigError(
+                "old config format: move mailbox to accounts.NAME and copy credentials "
+                "from .env into config.yaml; see README migration instructions"
+            )
+        accounts_raw = raw.get("accounts", {})
+        if not isinstance(accounts_raw, dict) or not accounts_raw:
+            raise ConfigError("config has no accounts; add an entry under accounts")
+        accounts = {}
+        for name, data in accounts_raw.items():
+            if not isinstance(name, str) or not name.strip():
+                raise ConfigError("account names must be non-empty strings")
+            mailbox = MailboxConfig(**data)
+            for key in ("host", "username", "password", "folder"):
+                if not isinstance(getattr(mailbox, key), str):
+                    raise ConfigError(f"accounts.{name}.{key} must be a string")
+            if not mailbox.host.strip():
+                raise ConfigError(f"accounts.{name}.host is empty")
+            mailbox.validate_numbers()
+            accounts[name] = mailbox
 
-    raw = yaml.safe_load(config_path.read_text()) or {}
-    env = dict(os.environ)
-
-    mb_raw = raw.get("mailbox", {})
-    mailbox = MailboxConfig(
-        host=_interpolate(mb_raw.get("host", ""), env),
-        port=int(mb_raw.get("port", 993)),
-        username=_interpolate(mb_raw.get("username", ""), env),
-        password=_interpolate(mb_raw.get("password", ""), env),
-        folder=mb_raw.get("folder", "INBOX"),
-        poll_interval_seconds=int(mb_raw.get("poll_interval_seconds", 60)),
-        max_emails_per_run=int(mb_raw.get("max_emails_per_run", 25)),
-    )
-    if not mailbox.host:
-        raise ConfigError("mailbox.host is empty — run `jev-mail configure` and fill in the IMAP host")
-
-    jev_raw = raw.get("jev", {})
-    jev = JevSettings(
-        provider=jev_raw.get("provider", "auto"),
-        default_threshold=float(jev_raw.get("default_threshold", 0.6)),
-    )
-
-    categories = [
-        Category(
-            name=name,
-            description=cat_raw.get("description", ""),
-            threshold=cat_raw.get("threshold"),
-            actions=[Action.from_dict(a) for a in cat_raw.get("actions", [])],
-        )
-        for name, cat_raw in (raw.get("categories") or {}).items()
-    ]
-    if not categories:
-        raise ConfigError("config has no categories — run `jev-mail configure` to add some")
-
-    return AppConfig(mailbox=mailbox, jev=jev, categories=categories)
+        jev = JevSettings(**raw.get("jev", {}))
+        jev.default_threshold = float(jev.default_threshold)
+        for key in ("provider", "typesafe_api_key", "openrouter_api_key"):
+            if not isinstance(getattr(jev, key), str):
+                raise ConfigError(f"jev.{key} must be a string")
+        categories = [
+            Category(
+                name=name,
+                description=data.get("description", ""),
+                threshold=data.get("threshold"),
+                actions=[Action.from_dict(a) for a in data.get("actions", [])],
+            )
+            for name, data in (raw.get("categories") or {}).items()
+        ]
+        return AppConfig(accounts=accounts, jev=jev, categories=categories)
+    except (OSError, yaml.YAMLError, TypeError, ValueError, AttributeError) as exc:
+        raise ConfigError("invalid config.yaml; check its syntax and setting types") from exc
 
 
 def save_config(config: AppConfig, config_path: str | Path) -> None:
-    """Writes config.yaml. Mailbox credentials are always written as ${VAR}
-    references, never as literal secrets, regardless of what's loaded in memory."""
+    for mailbox in config.accounts.values():
+        mailbox.validate_numbers()
     raw = {
-        "mailbox": {
-            "host": config.mailbox.host,
-            "port": config.mailbox.port,
-            "username": "${IMAP_USERNAME}",
-            "password": "${IMAP_PASSWORD}",
-            "folder": config.mailbox.folder,
-            "poll_interval_seconds": config.mailbox.poll_interval_seconds,
-            "max_emails_per_run": config.mailbox.max_emails_per_run,
-        },
-        "jev": {
-            "provider": config.jev.provider,
-            "default_threshold": config.jev.default_threshold,
-        },
+        "jev": asdict(config.jev),
+        "accounts": {name: asdict(mailbox) for name, mailbox in config.accounts.items()},
         "categories": {
             cat.name: {
                 "description": cat.description,
@@ -165,25 +162,10 @@ def save_config(config: AppConfig, config_path: str | Path) -> None:
             for cat in config.categories
         },
     }
-    Path(config_path).write_text(yaml.safe_dump(raw, sort_keys=False, default_flow_style=False))
-
-
-def read_env(env_path: str | Path) -> dict[str, str]:
-    """Parses a .env file into a plain dict, or {} if it doesn't exist yet."""
-    return {key: value for key, value in dotenv_values(env_path, interpolate=False).items() if value is not None}
-
-
-def save_env(values: dict[str, str], env_path: str | Path) -> None:
-    """Merges `values` into the .env file at `env_path`: a non-empty value
-    sets that key, an empty value removes it. Keys not present in `values`
-    at all are left untouched. (The credentials screen pre-fills every field
-    from the existing .env, so an empty field here means the user actually
-    cleared it -- not "didn't get around to typing anything.")"""
-    env_path = Path(env_path)
-    env_path.touch(exist_ok=True)
-    existing = dotenv_values(env_path, interpolate=False)
-    for key, value in values.items():
-        if value:
-            set_key(env_path, key, value)
-        elif key in existing:
-            unset_key(env_path, key)
+    content = yaml.safe_dump(raw, sort_keys=False, default_flow_style=False)
+    # Restrict access before writing credentials, including on an existing file.
+    fd = os.open(config_path, os.O_WRONLY | os.O_CREAT, 0o600)
+    with os.fdopen(fd, "w") as output:
+        os.fchmod(output.fileno(), 0o600)
+        output.truncate(0)
+        output.write(content)

@@ -1,38 +1,34 @@
 from __future__ import annotations
 
-import os
-
 from jev_mail.config import JevSettings
 
 from .base import DecisionsClient, JevClient, ProviderError
 
-# (provider name, env var, URL, model, error label), in auto-detect priority order.
+# (provider name, settings field, URL, model, error label), in auto-detect priority order.
 _BACKENDS = (
-    ("typesafe", "TYPESAFE_API_KEY", "https://api.typesafe.ai/v1/systemone", "jev-latest", "TypeSafe API"),
-    ("openrouter", "OPENROUTER_API_KEY", "https://openrouter.ai/api/alpha/decisions", "typesafe/jev-1.13", "OpenRouter"),
+    ("typesafe", "typesafe_api_key", "https://api.typesafe.ai/v1/systemone", "jev-latest", "TypeSafe API"),
+    ("openrouter", "openrouter_api_key", "https://openrouter.ai/api/alpha/decisions", "typesafe/jev-1.13", "OpenRouter"),
 )
 
 __all__ = ["JevClient", "ProviderError", "get_jev_client"]
 
 
-def get_jev_client(settings: JevSettings, env: dict | None = None) -> JevClient:
-    env = env if env is not None else os.environ
-
+def get_jev_client(settings: JevSettings) -> JevClient:
     if settings.provider == "auto":
-        for _, env_var, url, model, label in _BACKENDS:
-            api_key = env.get(env_var)
+        for _, key_field, url, model, label in _BACKENDS:
+            api_key = getattr(settings, key_field)
             if api_key:
                 return DecisionsClient(api_key, url, model, label)
         raise ProviderError(
-            "no Jev API key found -- set TYPESAFE_API_KEY or OPENROUTER_API_KEY "
+            "no Jev API key found -- set jev.typesafe_api_key or jev.openrouter_api_key in config.yaml "
             "(run `jev-mail configure` to set one)"
         )
 
-    for name, env_var, url, model, label in _BACKENDS:
+    for name, key_field, url, model, label in _BACKENDS:
         if settings.provider == name:
-            api_key = env.get(env_var)
+            api_key = getattr(settings, key_field)
             if not api_key:
-                raise ProviderError(f"jev.provider is {name!r} but {env_var} isn't set")
+                raise ProviderError(f"jev.provider is {name!r} but {key_field} isn't set")
             return DecisionsClient(api_key, url, model, label)
 
     raise ProviderError(f"unknown jev.provider: {settings.provider!r}")

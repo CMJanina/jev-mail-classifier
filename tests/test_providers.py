@@ -39,7 +39,7 @@ def test_decide_normalizes_probabilities(monkeypatch, provider, url, model, labe
 
     monkeypatch.setattr(httpx, "post", fake_post)
 
-    client = get_jev_client(JevSettings(provider=provider), env={f"{provider.upper()}_API_KEY": "test-key"})
+    client = get_jev_client(JevSettings(provider=provider, **{f"{provider}_api_key": "test-key"}))
     result = client.decide("some email body", CATEGORIES)
 
     assert captured["url"] == url
@@ -60,7 +60,7 @@ def test_decide_raises_provider_error_on_http_failure(monkeypatch):
         raise httpx.ConnectError("boom")
 
     monkeypatch.setattr(httpx, "post", fake_post)
-    client = get_jev_client(JevSettings(provider="openrouter"), env={"OPENROUTER_API_KEY": "test-key"})
+    client = get_jev_client(JevSettings(provider="openrouter", openrouter_api_key="test-key"))
 
     with pytest.raises(ProviderError):
         client.decide("body", CATEGORIES)
@@ -82,7 +82,7 @@ def test_decide_error_message_is_short_not_the_full_httpx_dump(monkeypatch):
     request URL plus an MDN boilerplate line -- unreadable dumped into a
     single status line in the TUI or CLI stderr."""
     monkeypatch.setattr(httpx, "post", lambda *a, **k: _fake_response({}, status_code=403))
-    client = get_jev_client(JevSettings(provider="openrouter"), env={"OPENROUTER_API_KEY": "test-key"})
+    client = get_jev_client(JevSettings(provider="openrouter", openrouter_api_key="test-key"))
 
     with pytest.raises(ProviderError) as exc_info:
         client.decide("body", CATEGORIES)
@@ -95,7 +95,7 @@ def test_decide_error_message_is_short_not_the_full_httpx_dump(monkeypatch):
 
 def test_decide_raises_provider_error_on_missing_answer(monkeypatch):
     monkeypatch.setattr(httpx, "post", lambda *a, **k: _fake_response({"answers": {}}))
-    client = get_jev_client(JevSettings(provider="openrouter"), env={"OPENROUTER_API_KEY": "test-key"})
+    client = get_jev_client(JevSettings(provider="openrouter", openrouter_api_key="test-key"))
 
     with pytest.raises(ProviderError):
         client.decide("body", CATEGORIES)
@@ -109,27 +109,34 @@ def test_get_jev_client_auto_detect_priority(monkeypatch):
         return _fake_response({"answers": {}})
 
     monkeypatch.setattr(httpx, "post", fake_post)
-    env = {"OPENROUTER_API_KEY": "or-key"}
-    client = get_jev_client(JevSettings(provider="auto"), env=env)
+    env = {"openrouter_api_key": "or-key"}
+    client = get_jev_client(JevSettings(provider="auto", **env))
     client.decide("body", {})
     assert captured[-1] == ("https://openrouter.ai/api/alpha/decisions", "Bearer or-key")
 
-    env = {"TYPESAFE_API_KEY": "ts-key", "OPENROUTER_API_KEY": "or-key"}
-    client = get_jev_client(JevSettings(provider="auto"), env=env)
+    env = {"typesafe_api_key": "ts-key", "openrouter_api_key": "or-key"}
+    client = get_jev_client(JevSettings(provider="auto", **env))
     client.decide("body", {})
     assert captured[-1] == ("https://api.typesafe.ai/v1/systemone", "Bearer ts-key")
 
 
 def test_get_jev_client_auto_detect_no_keys_raises():
     with pytest.raises(ProviderError):
-        get_jev_client(JevSettings(provider="auto"), env={})
+        get_jev_client(JevSettings(provider="auto"))
 
 
 def test_get_jev_client_explicit_provider_missing_key_raises():
     with pytest.raises(ProviderError):
-        get_jev_client(JevSettings(provider="openrouter"), env={})
+        get_jev_client(JevSettings(provider="openrouter"))
 
 
 def test_get_jev_client_explicit_provider_unknown_raises():
     with pytest.raises(ProviderError):
-        get_jev_client(JevSettings(provider="not-a-real-provider"), env={"TYPESAFE_API_KEY": "x"})
+        get_jev_client(JevSettings(provider="not-a-real-provider", typesafe_api_key="x"))
+
+
+def test_provider_ignores_environment_keys(monkeypatch):
+    monkeypatch.setenv("TYPESAFE_API_KEY", "environment-key")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "environment-key")
+    with pytest.raises(ProviderError, match="no Jev API key"):
+        get_jev_client(JevSettings())

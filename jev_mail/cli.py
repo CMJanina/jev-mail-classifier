@@ -8,22 +8,21 @@ from pathlib import Path
 
 from jev_mail.actions import run_action
 from jev_mail.classify import classify, matched_categories
-from jev_mail.config import AppConfig, ConfigError, load_config
+from jev_mail.config import AppConfig, ConfigError, JevSettings, MailboxConfig, load_config
 from jev_mail.mailbox import Mailbox
 from jev_mail.providers import ProviderError, get_jev_client
 from jev_mail.providers.base import JevClient
 
 
-def _paths(args: argparse.Namespace) -> tuple[Path, Path]:
-    base = Path(args.dir)
-    return base / "config.yaml", base / ".env"
+def _config_path(args: argparse.Namespace) -> Path:
+    return Path(args.dir) / "config.yaml"
 
 
-def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig, dry_run: bool) -> None:
-    emails = mailbox.fetch_unprocessed(limit=config.mailbox.max_emails_per_run)
-    if len(emails) == config.mailbox.max_emails_per_run:
+def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig, dry_run: bool, limit: int = 25) -> None:
+    emails = mailbox.fetch_unprocessed(limit=limit)
+    if len(emails) == limit:
         print(
-            f"[jev-mail] hit max_emails_per_run ({config.mailbox.max_emails_per_run}) -- "
+            f"[jev-mail] hit max_emails_per_run ({limit}) -- "
             "there may be more unprocessed mail left for next run"
         )
     for mail in emails:
@@ -54,22 +53,30 @@ def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig,
                 mailbox.mark_processed(mail.uid)
 
 
-def _mailbox_error_message(exc: Exception, config: AppConfig) -> str:
+def _mailbox_error_message(exc: Exception, config: MailboxConfig) -> str:
     if isinstance(exc, OSError):
-        return f"couldn't connect to {config.mailbox.host}:{config.mailbox.port} -- {exc}"
-    return f"IMAP error talking to {config.mailbox.host} -- {exc}"
+        return f"couldn't connect to {config.host}:{config.port} -- {exc}"
+    return f"IMAP error talking to {config.host} -- {exc}"
 
 
 def cmd_configure(args: argparse.Namespace) -> int:
     from jev_mail.tui.app import JevMailConfigApp
 
-    config_path, env_path = _paths(args)
+    config_path = _config_path(args)
     try:
-        config = load_config(config_path, env_path)
-    except ConfigError:
-        config = None
+        config = load_config(config_path) if config_path.exists() else AppConfig({}, JevSettings(), [])
+        if args.account is not None:
+            name = args.account
+            if not name.strip():
+                raise ConfigError("account name must not be empty")
+        else:
+            name = config.account_name(None) if config.accounts else "default"
+        config.accounts.setdefault(name, MailboxConfig(host=""))
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
-    JevMailConfigApp(config_path, env_path, config).run()
+    JevMailConfigApp(config_path, config, name).run()
     return 0
 
 
@@ -82,40 +89,43 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 
 def _run(args: argparse.Namespace, watch: bool) -> int:
-    config_path, env_path = _paths(args)
+    config_path = _config_path(args)
     try:
-        config = load_config(config_path, env_path)
+        config = load_config(config_path)
+        account = config.accounts[config.account_name(args.account)]
+        if not config.categories:
+            raise ConfigError("config has no categories; run `jev-mail configure` to add some")
         client = get_jev_client(config.jev)
     except (ConfigError, ProviderError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
     if watch:
-        print(f"watching {config.mailbox.folder}@{config.mailbox.host} (ctrl-c to stop)...")
+        print(f"watching {account.folder}@{account.host} (ctrl-c to stop)...")
     try:
-        with Mailbox(config.mailbox, readonly=args.dry_run) as mailbox:
+        with Mailbox(account, readonly=args.dry_run) as mailbox:
             while True:
-                _process_unprocessed(mailbox, client, config, args.dry_run)
+                _process_unprocessed(mailbox, client, config, args.dry_run, account.max_emails_per_run)
                 if not watch:
                     return 0
                 if mailbox.supports_idle():
                     mailbox.idle()
-                    mailbox.idle_check(timeout=min(config.mailbox.poll_interval_seconds, 600))
+                    mailbox.idle_check(timeout=min(account.poll_interval_seconds, 600))
                     mailbox.idle_done()
                 else:
-                    time.sleep(config.mailbox.poll_interval_seconds)
+                    time.sleep(account.poll_interval_seconds)
     except (OSError, imaplib.IMAP4.error) as exc:
-        print(f"error: {_mailbox_error_message(exc, config)}", file=sys.stderr)
+        print(f"error: {_mailbox_error_message(exc, account)}", file=sys.stderr)
         return 1
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="jev-mail", description="Classify your inbox with Jev.")
-    parser.set_defaults(dry_run=False)
-    parser.add_argument("--dir", default=".", help="directory holding config.yaml / .env (default: cwd)")
+    parser.set_defaults(dry_run=False, account=None)
+    parser.add_argument("--dir", default=".", help="directory holding config.yaml (default: cwd)")
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser("configure", help="open the TUI to build/edit config.yaml")
+    configure_parser = subparsers.add_parser("configure", help="open the TUI to build/edit config.yaml")
 
     run_parser = subparsers.add_parser("run", help="classify unprocessed mail once and exit")
     run_parser.add_argument("--dry-run", action="store_true", help="classify and print, without applying any action")
@@ -123,12 +133,15 @@ def build_parser() -> argparse.ArgumentParser:
     watch_parser = subparsers.add_parser("watch", help="keep classifying new mail as it arrives")
     watch_parser.add_argument("--dry-run", action="store_true", help="classify and print, without applying any action")
 
+    for command_parser in (configure_parser, run_parser, watch_parser):
+        command_parser.add_argument("--account", help="account name in config.yaml; configure creates it if missing")
+
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
-    config_path, _ = _paths(args)
+    config_path = _config_path(args)
 
     if args.command is None:
         args.command = "configure" if not config_path.exists() else "run"

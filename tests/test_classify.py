@@ -6,7 +6,7 @@ from jev_mail.config import Action, AppConfig, Category, JevSettings, MailboxCon
 
 def _config(**category_overrides) -> AppConfig:
     return AppConfig(
-        mailbox=MailboxConfig(host="imap.example.com"),
+        accounts={"default": MailboxConfig(host="imap.example.com")},
         jev=JevSettings(default_threshold=0.6),
         categories=[
             Category(name="invoice", description="Invoice", actions=[Action(type="tag", value="Invoice")]),

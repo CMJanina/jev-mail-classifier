@@ -1,20 +1,25 @@
-# Generated automatically by `jev-mail configure`. Hand-editing is fine too --
-# this file is just for reference / a starting point if you'd rather not use
-# the TUI. Secrets never go here: they live in .env and are referenced as
-# ${VAR}.
-
-mailbox:
-  host: imap.gmail.com
-  port: 993
-  username: ${IMAP_USERNAME}
-  password: ${IMAP_PASSWORD}
-  folder: INBOX
-  poll_interval_seconds: 60 # used by `watch` only if the server has no IDLE support
-  max_emails_per_run: 25 # caps how many unprocessed emails get classified in one run/poll
-
+# All settings and credentials live here. The wizard saves this file with mode 0600.
+# Categories and API keys are shared by all accounts.
 jev:
   provider: auto # auto | typesafe | openrouter
+  typesafe_api_key: ""
+  openrouter_api_key: "" # fill in one API key
   default_threshold: 0.6
+
+accounts:
+  personal:
+    host: imap.example.com
+    port: 993
+    username: me@example.com
+    password: "your-password"
+    folder: INBOX
+    poll_interval_seconds: 60
+    max_emails_per_run: 25
+  work:
+    host: imap.work.example.com
+    username: me@work.example.com
+    password: "your-work-password"
+    folder: INBOX
 
 categories:
   invoice:

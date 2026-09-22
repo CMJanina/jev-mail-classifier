@@ -2,7 +2,7 @@
 # Thin wrapper so `./jev-mail ...` (or an absolute/symlinked path to this
 # file) works without activating the venv or being on PATH. Always pins
 # --dir to this project's own directory, regardless of the caller's cwd, so
-# config.yaml/.env are found reliably every time.
+# config.yaml are found reliably every time.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

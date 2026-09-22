@@ -29,7 +29,7 @@ class CategoriesScreen(Screen[None]):
         yield Header()
         with Container(id="panel"):
             yield Static("\U0001f5c2️  Categories", classes="title")
-            yield Static("Step 3 of 3 -- a add · e edit · d delete · s save & exit", classes="subtitle")
+            yield Static("Step 3 of 3. Shared across all accounts. a add · e edit · d delete · s save & exit", classes="subtitle")
             yield ListView(id="category_list")
         yield Footer()
 

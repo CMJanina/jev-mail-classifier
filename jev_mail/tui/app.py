@@ -126,28 +126,25 @@ VerticalScroll, ListView {
 
 
 class JevMailConfigApp(App):
-    """Credentials -> Mailbox -> Categories, then writes config.yaml (and,
-    via the credentials screen, .env). Each step's Continue/Save dismisses
-    with the collected data; the app wires results into `self.config`."""
-
     TITLE = "jev-mail"
     CSS = CSS
 
-    def __init__(self, config_path: Path, env_path: Path, config: AppConfig | None = None):
+    def __init__(self, config_path: Path, config: AppConfig | None = None, account: str = "default"):
         super().__init__()
         self.theme = "gruvbox"
+        self.title = f"jev-mail / {account}"
         self.config_path = config_path
-        self.env_path = env_path
-        self.config = config or AppConfig(mailbox=MailboxConfig(host=""), jev=JevSettings(), categories=[])
+        self.account = account
+        self.config = config or AppConfig(accounts={account: MailboxConfig(host="")}, jev=JevSettings(), categories=[])
 
     def on_mount(self) -> None:
-        self.push_screen(CredentialsScreen(self.env_path), self._after_credentials)
+        self.push_screen(CredentialsScreen(self.config.jev, self.config.accounts[self.account]), self._after_credentials)
 
     def _after_credentials(self, _: None) -> None:
-        self.push_screen(MailboxScreen(self.config.mailbox), self._after_mailbox)
+        self.push_screen(MailboxScreen(self.config.accounts[self.account]), self._after_mailbox)
 
     def _after_mailbox(self, mailbox: MailboxConfig) -> None:
-        self.config.mailbox = mailbox
+        self.config.accounts[self.account] = mailbox
         self.push_screen(CategoriesScreen(self.config), self._after_categories)
 
     def _after_categories(self, _: None) -> None:

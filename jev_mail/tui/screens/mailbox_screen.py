@@ -5,12 +5,11 @@ from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Label, Static
 
-from jev_mail.config import MailboxConfig
+from jev_mail.config import ConfigError, MailboxConfig
 
 
 class MailboxScreen(Screen[MailboxConfig]):
-    """Second screen: which mailbox/folder to watch. Credentials already live
-    in .env from the previous screen -- only non-secret settings live here."""
+    """Second screen: connection settings for the selected account."""
 
     def __init__(self, mailbox: MailboxConfig):
         super().__init__()
@@ -49,8 +48,8 @@ class MailboxScreen(Screen[MailboxConfig]):
         if not host:
             self.query_one("#mailbox_error", Static).update("IMAP host is required, e.g. imap.gmail.com -- see the README's IMAP section.")
             return
-        self.dismiss(
-            MailboxConfig(
+        try:
+            mailbox = MailboxConfig(
                 host=host,
                 port=int(self.query_one("#port", Input).value or 993),
                 username=self._mailbox.username,
@@ -59,4 +58,9 @@ class MailboxScreen(Screen[MailboxConfig]):
                 poll_interval_seconds=int(self.query_one("#poll_interval", Input).value or 60),
                 max_emails_per_run=int(self.query_one("#max_emails_per_run", Input).value or 25),
             )
-        )
+            mailbox.validate_numbers()
+        except (ConfigError, ValueError) as exc:
+            message = str(exc) if isinstance(exc, ConfigError) else "Port, poll interval, and run limit must be positive integers."
+            self.query_one("#mailbox_error", Static).update(message)
+            return
+        self.dismiss(mailbox)
