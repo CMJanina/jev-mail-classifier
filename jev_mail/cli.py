@@ -128,10 +128,10 @@ def build_parser() -> argparse.ArgumentParser:
     configure_parser = subparsers.add_parser("configure", help="open the TUI to build/edit config.yaml")
 
     run_parser = subparsers.add_parser("run", help="classify unprocessed mail once and exit")
-    run_parser.add_argument("--dry-run", action="store_true", help="classify and print, without applying any action")
+    run_parser.add_argument("-n", "--dry-run", action="store_true", help="classify and print, without applying any action")
 
     watch_parser = subparsers.add_parser("watch", help="keep classifying new mail as it arrives")
-    watch_parser.add_argument("--dry-run", action="store_true", help="classify and print, without applying any action")
+    watch_parser.add_argument("-n", "--dry-run", action="store_true", help="classify and print, without applying any action")
 
     for command_parser in (configure_parser, run_parser, watch_parser):
         command_parser.add_argument("--account", help="account name in config.yaml; configure creates it if missing")
