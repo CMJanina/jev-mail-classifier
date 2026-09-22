@@ -10,6 +10,7 @@ from jev_mail.config import (
     JevSettings,
     MailboxConfig,
     load_config,
+    read_env,
     save_config,
     save_env,
 )
@@ -158,10 +159,10 @@ def test_save_env_merges_and_preserves_existing(tmp_path):
 
     save_env({"OPENROUTER_API_KEY": "new", "IMAP_USERNAME": "me@example.com"}, env_path)
 
-    content = env_path.read_text()
-    assert "EXISTING=keep" in content
-    assert "OPENROUTER_API_KEY=new" in content
-    assert "IMAP_USERNAME=me@example.com" in content
+    content = read_env(env_path)
+    assert content["EXISTING"] == "keep"
+    assert content["OPENROUTER_API_KEY"] == "new"
+    assert content["IMAP_USERNAME"] == "me@example.com"
 
 
 def test_save_env_removes_key_when_new_value_is_empty(tmp_path):
@@ -172,10 +173,10 @@ def test_save_env_removes_key_when_new_value_is_empty(tmp_path):
 
     save_env({"REMOVE_ME": "", "NEW": "value"}, env_path)
 
-    content = env_path.read_text()
+    content = read_env(env_path)
     assert "REMOVE_ME" not in content
-    assert "KEEP=me" in content
-    assert "NEW=value" in content
+    assert content["KEEP"] == "me"
+    assert content["NEW"] == "value"
 
 
 def test_save_env_leaves_keys_not_passed_untouched(tmp_path):
@@ -184,6 +185,18 @@ def test_save_env_leaves_keys_not_passed_untouched(tmp_path):
 
     save_env({"NEW": "value"}, env_path)
 
-    content = env_path.read_text()
-    assert "UNTOUCHED=still-here" in content
-    assert "NEW=value" in content
+    content = read_env(env_path)
+    assert content["UNTOUCHED"] == "still-here"
+    assert content["NEW"] == "value"
+
+
+def test_env_quotes_comments_and_literal_references_round_trip(tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text("# Keep this comment\nexport EXISTING='quoted value' # untouched\nBARE\n")
+    assert read_env(env_path) == {"EXISTING": "quoted value"}
+
+    values = {"IMAP_PASSWORD": "it's a \"secret\" # with\nlines and ${LITERAL}"}
+    save_env(values, env_path)
+
+    assert read_env(env_path) == {"EXISTING": "quoted value", **values}
+    assert env_path.read_text().startswith("# Keep this comment\nexport EXISTING='quoted value' # untouched\nBARE\n")

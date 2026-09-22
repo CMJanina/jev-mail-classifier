@@ -4,8 +4,6 @@ import pytest
 from jev_mail.config import JevSettings
 from jev_mail.providers import ProviderError, get_jev_client
 from jev_mail.providers.base import describe_http_error
-from jev_mail.providers.openrouter import OpenRouterJevClient
-from jev_mail.providers.typesafe_direct import TypeSafeDirectClient
 
 
 def _fake_response(json_body: dict, status_code: int = 200) -> httpx.Response:
@@ -16,15 +14,20 @@ CATEGORIES = {"invoice": "Invoice or billing", "urgent": "Time-sensitive"}
 
 
 @pytest.mark.parametrize(
-    "client_cls",
-    [OpenRouterJevClient, TypeSafeDirectClient],
+    "provider,url,model,label",
+    [
+        ("openrouter", "https://openrouter.ai/api/alpha/decisions", "typesafe/jev-1.13", "OpenRouter"),
+        ("typesafe", "https://api.typesafe.ai/v1/systemone", "jev-latest", "TypeSafe API"),
+    ],
 )
-def test_decide_normalizes_probabilities(monkeypatch, client_cls):
+def test_decide_normalizes_probabilities(monkeypatch, provider, url, model, label):
     captured = {}
 
     def fake_post(url, headers=None, json=None, timeout=None):
         captured["url"] = url
         captured["json"] = json
+        captured["headers"] = headers
+        captured["timeout"] = timeout
         return _fake_response(
             {
                 "answers": {
@@ -36,12 +39,20 @@ def test_decide_normalizes_probabilities(monkeypatch, client_cls):
 
     monkeypatch.setattr(httpx, "post", fake_post)
 
-    client = client_cls(api_key="test-key")
+    client = get_jev_client(JevSettings(provider=provider), env={f"{provider.upper()}_API_KEY": "test-key"})
     result = client.decide("some email body", CATEGORIES)
 
+    assert captured["url"] == url
+    assert captured["json"]["model"] == model
+    assert captured["headers"]["Authorization"] == "Bearer test-key"
+    assert captured["timeout"] == 15.0
     assert result == {"invoice": 0.9, "urgent": 0.2}
     assert captured["json"]["state"] == "some email body"
     assert set(captured["json"]["questions"]) == set(CATEGORIES)
+
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: _fake_response({}, status_code=403))
+    with pytest.raises(ProviderError, match=f"{label} request failed: 403 Forbidden"):
+        client.decide("body", CATEGORIES)
 
 
 def test_decide_raises_provider_error_on_http_failure(monkeypatch):
@@ -49,7 +60,7 @@ def test_decide_raises_provider_error_on_http_failure(monkeypatch):
         raise httpx.ConnectError("boom")
 
     monkeypatch.setattr(httpx, "post", fake_post)
-    client = OpenRouterJevClient(api_key="test-key")
+    client = get_jev_client(JevSettings(provider="openrouter"), env={"OPENROUTER_API_KEY": "test-key"})
 
     with pytest.raises(ProviderError):
         client.decide("body", CATEGORIES)
@@ -71,7 +82,7 @@ def test_decide_error_message_is_short_not_the_full_httpx_dump(monkeypatch):
     request URL plus an MDN boilerplate line -- unreadable dumped into a
     single status line in the TUI or CLI stderr."""
     monkeypatch.setattr(httpx, "post", lambda *a, **k: _fake_response({}, status_code=403))
-    client = OpenRouterJevClient(api_key="test-key")
+    client = get_jev_client(JevSettings(provider="openrouter"), env={"OPENROUTER_API_KEY": "test-key"})
 
     with pytest.raises(ProviderError) as exc_info:
         client.decide("body", CATEGORIES)
@@ -84,20 +95,29 @@ def test_decide_error_message_is_short_not_the_full_httpx_dump(monkeypatch):
 
 def test_decide_raises_provider_error_on_missing_answer(monkeypatch):
     monkeypatch.setattr(httpx, "post", lambda *a, **k: _fake_response({"answers": {}}))
-    client = OpenRouterJevClient(api_key="test-key")
+    client = get_jev_client(JevSettings(provider="openrouter"), env={"OPENROUTER_API_KEY": "test-key"})
 
     with pytest.raises(ProviderError):
         client.decide("body", CATEGORIES)
 
 
 def test_get_jev_client_auto_detect_priority(monkeypatch):
+    captured = []
+
+    def fake_post(url, **kwargs):
+        captured.append((url, kwargs["headers"]["Authorization"]))
+        return _fake_response({"answers": {}})
+
+    monkeypatch.setattr(httpx, "post", fake_post)
     env = {"OPENROUTER_API_KEY": "or-key"}
     client = get_jev_client(JevSettings(provider="auto"), env=env)
-    assert isinstance(client, OpenRouterJevClient)
+    client.decide("body", {})
+    assert captured[-1] == ("https://openrouter.ai/api/alpha/decisions", "Bearer or-key")
 
     env = {"TYPESAFE_API_KEY": "ts-key", "OPENROUTER_API_KEY": "or-key"}
     client = get_jev_client(JevSettings(provider="auto"), env=env)
-    assert isinstance(client, TypeSafeDirectClient)
+    client.decide("body", {})
+    assert captured[-1] == ("https://api.typesafe.ai/v1/systemone", "Bearer ts-key")
 
 
 def test_get_jev_client_auto_detect_no_keys_raises():

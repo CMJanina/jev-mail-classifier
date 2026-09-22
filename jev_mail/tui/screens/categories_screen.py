@@ -67,7 +67,13 @@ class CategoriesScreen(Screen[None]):
         index = self._selected_index()
         if index is None:
             return
-        self.app.push_screen(CategoryEditScreen(self._config.categories[index]), self._make_edit_callback(index))
+
+        def _on_edit_done(result: Category | None) -> None:
+            if result is not None:
+                self._config.categories[index] = result
+                self._refresh_list()
+
+        self.app.push_screen(CategoryEditScreen(self._config.categories[index]), _on_edit_done)
 
     def action_delete_category(self) -> None:
         index = self._selected_index()
@@ -83,11 +89,3 @@ class CategoriesScreen(Screen[None]):
         if result is not None:
             self._config.categories.append(result)
             self._refresh_list()
-
-    def _make_edit_callback(self, index: int):
-        def _on_edit_done(result: Category | None) -> None:
-            if result is not None:
-                self._config.categories[index] = result
-                self._refresh_list()
-
-        return _on_edit_done

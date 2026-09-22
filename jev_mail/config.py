@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv, set_key, unset_key
 
 _VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
@@ -158,16 +158,7 @@ def save_config(config: AppConfig, config_path: str | Path) -> None:
 
 def read_env(env_path: str | Path) -> dict[str, str]:
     """Parses a .env file into a plain dict, or {} if it doesn't exist yet."""
-    env_path = Path(env_path)
-    values: dict[str, str] = {}
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, val = line.partition("=")
-            values[key.strip()] = val.strip()
-    return values
+    return {key: value for key, value in dotenv_values(env_path, interpolate=False).items() if value is not None}
 
 
 def save_env(values: dict[str, str], env_path: str | Path) -> None:
@@ -177,10 +168,10 @@ def save_env(values: dict[str, str], env_path: str | Path) -> None:
     from the existing .env, so an empty field here means the user actually
     cleared it -- not "didn't get around to typing anything.")"""
     env_path = Path(env_path)
-    existing = read_env(env_path)
+    env_path.touch(exist_ok=True)
+    existing = dotenv_values(env_path, interpolate=False)
     for key, value in values.items():
         if value:
-            existing[key] = value
-        else:
-            existing.pop(key, None)
-    env_path.write_text("".join(f"{k}={v}\n" for k, v in existing.items()))
+            set_key(env_path, key, value)
+        elif key in existing:
+            unset_key(env_path, key)

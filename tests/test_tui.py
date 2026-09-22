@@ -1,7 +1,7 @@
 from textual.containers import VerticalScroll
 from textual.widgets import Checkbox, Input, Static
 
-from jev_mail.config import load_config
+from jev_mail.config import load_config, read_env
 from jev_mail.providers import ProviderError
 from jev_mail.tui.app import JevMailConfigApp
 from jev_mail.tui.screens import credentials_screen as credentials_screen_module
@@ -60,8 +60,8 @@ async def test_full_configure_flow_writes_env_and_config(tmp_path):
         await pilot.press("s")
 
     assert env_path.exists()
-    assert "OPENROUTER_API_KEY=or-test-key" in env_path.read_text()
-    assert "IMAP_USERNAME=me@example.com" in env_path.read_text()
+    assert read_env(env_path)["OPENROUTER_API_KEY"] == "or-test-key"
+    assert read_env(env_path)["IMAP_USERNAME"] == "me@example.com"
 
     assert config_path.exists()
     reloaded = load_config(config_path, env_path)
@@ -85,7 +85,7 @@ async def test_credentials_screen_prefills_from_existing_env(tmp_path):
         # Continuing without touching anything must NOT wipe the saved key.
         await pilot.click("#continue")
 
-    assert "OPENROUTER_API_KEY=already-saved" in env_path.read_text()
+    assert read_env(env_path)["OPENROUTER_API_KEY"] == "already-saved"
 
 
 async def test_clearing_a_prefilled_field_and_saving_removes_it(tmp_path):
@@ -99,9 +99,9 @@ async def test_clearing_a_prefilled_field_and_saving_removes_it(tmp_path):
         pilot.app.screen.query_one("#openrouter_key", Input).value = ""
         await pilot.click("#continue")
 
-    content = env_path.read_text()
+    content = read_env(env_path)
     assert "OPENROUTER_API_KEY" not in content
-    assert "IMAP_USERNAME=me@example.com" in content
+    assert content["IMAP_USERNAME"] == "me@example.com"
 
 
 async def test_test_key_button_shows_green_tick_on_success(monkeypatch, tmp_path):
