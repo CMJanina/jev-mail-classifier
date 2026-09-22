@@ -67,24 +67,14 @@ def cmd_configure(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    config_path, env_path = _paths(args)
-    try:
-        config = load_config(config_path, env_path)
-        client = get_jev_client(config.jev)
-    except (ConfigError, ProviderError) as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 1
-
-    try:
-        with Mailbox(config.mailbox) as mailbox:
-            _process_unprocessed(mailbox, client, config, args.dry_run)
-    except (OSError, imaplib.IMAP4.error) as exc:
-        print(f"error: {_mailbox_error_message(exc, config)}", file=sys.stderr)
-        return 1
-    return 0
+    return _run(args, watch=False)
 
 
 def cmd_watch(args: argparse.Namespace) -> int:
+    return _run(args, watch=True)
+
+
+def _run(args: argparse.Namespace, watch: bool) -> int:
     config_path, env_path = _paths(args)
     try:
         config = load_config(config_path, env_path)
@@ -93,18 +83,20 @@ def cmd_watch(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
-    print(f"watching {config.mailbox.folder}@{config.mailbox.host} (ctrl-c to stop)...")
+    if watch:
+        print(f"watching {config.mailbox.folder}@{config.mailbox.host} (ctrl-c to stop)...")
     try:
         with Mailbox(config.mailbox) as mailbox:
-            _process_unprocessed(mailbox, client, config, args.dry_run)
             while True:
+                _process_unprocessed(mailbox, client, config, args.dry_run)
+                if not watch:
+                    return 0
                 if mailbox.supports_idle():
                     mailbox.idle()
                     mailbox.idle_check(timeout=min(config.mailbox.poll_interval_seconds, 600))
                     mailbox.idle_done()
                 else:
                     time.sleep(config.mailbox.poll_interval_seconds)
-                _process_unprocessed(mailbox, client, config, args.dry_run)
     except (OSError, imaplib.IMAP4.error) as exc:
         print(f"error: {_mailbox_error_message(exc, config)}", file=sys.stderr)
         return 1
@@ -112,6 +104,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="jev-mail", description="Classify your inbox with Jev.")
+    parser.set_defaults(dry_run=False)
     parser.add_argument("--dir", default=".", help="directory holding config.yaml / .env (default: cwd)")
     subparsers = parser.add_subparsers(dest="command")
 
@@ -132,8 +125,6 @@ def main() -> None:
 
     if args.command is None:
         args.command = "configure" if not config_path.exists() else "run"
-        if args.command == "run":
-            args.dry_run = False
 
     commands = {"configure": cmd_configure, "run": cmd_run, "watch": cmd_watch}
     sys.exit(commands[args.command](args))

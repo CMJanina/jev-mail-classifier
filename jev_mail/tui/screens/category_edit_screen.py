@@ -33,10 +33,10 @@ class CategoryEditScreen(Screen[Category | None]):
 
                 yield Static("Actions when matched", classes="subtitle")
                 yield Checkbox("Tag", value="tag" in actions_by_type, id="cb_tag")
-                yield Input(value=actions_by_type.get("tag", Action(type="tag")).value or "", placeholder="tag value", id="tag_value")
+                yield Input(value=actions_by_type["tag"].value if "tag" in actions_by_type else "", placeholder="tag value", id="tag_value")
 
                 yield Checkbox("Move to folder", value="move" in actions_by_type, id="cb_move")
-                yield Input(value=actions_by_type.get("move", Action(type="move")).folder or "", placeholder="folder name", id="move_folder")
+                yield Input(value=actions_by_type["move"].folder if "move" in actions_by_type else "", placeholder="folder name", id="move_folder")
             with Horizontal(classes="actions-dock"):
                 yield Button("Save", id="save", variant="primary")
                 yield Button("Cancel", id="cancel")

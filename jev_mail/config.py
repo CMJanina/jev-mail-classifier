@@ -4,6 +4,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from dotenv import dotenv_values, load_dotenv, set_key, unset_key
@@ -17,17 +18,28 @@ class ConfigError(Exception):
     """Raised for a malformed or incomplete config.yaml."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class Action:
-    type: str
+    type: Literal["tag", "move"]
     value: str | None = None
     folder: str | None = None
 
+    def __post_init__(self) -> None:
+        if self.type not in ACTION_TYPES:
+            raise ConfigError(f"unknown action type: {self.type!r}")
+        payload = self.value if self.type == "tag" else self.folder
+        if not isinstance(payload, str) or not payload.strip():
+            raise ConfigError(f"{self.type} action requires a non-empty {'value' if self.type == 'tag' else 'folder'}")
+        if self.type == "tag":
+            # IMAP keywords are atoms, not quoted strings.
+            if any(ord(c) < 33 or ord(c) > 126 or c in '(){%*"\\]' for c in payload):
+                raise ConfigError("tag value must be an IMAP keyword without spaces or special characters")
+        elif any(ord(c) < 32 or ord(c) == 127 for c in payload):
+            raise ConfigError("move folder must not contain control characters")
+
     @classmethod
     def from_dict(cls, data: dict) -> "Action":
-        if data.get("type") not in ACTION_TYPES:
-            raise ConfigError(f"unknown action type: {data.get('type')!r}")
-        return cls(type=data["type"], value=data.get("value"), folder=data.get("folder"))
+        return cls(type=data.get("type"), value=data.get("value"), folder=data.get("folder"))
 
     def to_dict(self) -> dict:
         out: dict = {"type": self.type}

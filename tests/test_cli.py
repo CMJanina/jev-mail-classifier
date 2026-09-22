@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
 
+import pytest
+
 import jev_mail.cli as cli
 from jev_mail.config import Action, AppConfig, Category, JevSettings, MailboxConfig
 from jev_mail.mailbox import Email
@@ -15,6 +17,7 @@ def _config() -> AppConfig:
 
 def test_build_parser_defaults_and_dry_run_flag():
     parser = cli.build_parser()
+    assert parser.parse_args([]).dry_run is False
 
     args = parser.parse_args(["run", "--dry-run"])
     assert args.command == "run"
@@ -90,23 +93,25 @@ def test_process_unprocessed_below_threshold_no_actions():
     mailbox.mark_processed.assert_called_once_with(1)
 
 
-def test_cmd_run_reports_config_error(monkeypatch, capsys):
+@pytest.mark.parametrize("command", ["run", "watch"])
+def test_command_reports_config_error(monkeypatch, capsys, command):
     from jev_mail.config import ConfigError
 
     def raise_config_error(*a, **k):
         raise ConfigError("no config file")
 
     monkeypatch.setattr(cli, "load_config", raise_config_error)
-    args = cli.build_parser().parse_args(["run"])
+    args = cli.build_parser().parse_args([command])
     args.dir = "."
 
-    exit_code = cli.cmd_run(args)
+    exit_code = getattr(cli, f"cmd_{command}")(args)
 
     assert exit_code == 1
     assert "no config file" in capsys.readouterr().err
 
 
-def test_cmd_run_reports_connection_error_not_a_traceback(monkeypatch, capsys):
+@pytest.mark.parametrize("command", ["run", "watch"])
+def test_command_reports_connection_error_not_a_traceback(monkeypatch, capsys, command):
     monkeypatch.setattr(cli, "load_config", lambda *a, **k: _config())
     monkeypatch.setattr(cli, "get_jev_client", lambda *a, **k: MagicMock())
 
@@ -121,10 +126,10 @@ def test_cmd_run_reports_connection_error_not_a_traceback(monkeypatch, capsys):
             return False
 
     monkeypatch.setattr(cli, "Mailbox", FakeMailbox)
-    args = cli.build_parser().parse_args(["run"])
+    args = cli.build_parser().parse_args([command])
     args.dir = "."
 
-    exit_code = cli.cmd_run(args)
+    exit_code = getattr(cli, f"cmd_{command}")(args)
 
     err = capsys.readouterr().err
     assert exit_code == 1
