@@ -29,6 +29,10 @@ def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig,
     for mail in emails:
         probabilities = classify(client, config, mail.state)
         matched = matched_categories(config, probabilities)
+        moves = {a.folder for c in matched for a in c.actions if a.type == "move"}
+        if len(moves) > 1:
+            print(f"[jev-mail] {mail.subject!r}: conflicting move destinations; skipped")
+            continue
 
         if not matched and dry_run:
             print(f"[dry-run] {mail.subject!r}: no category matched")
@@ -38,13 +42,16 @@ def _process_unprocessed(mailbox: Mailbox, client: JevClient, config: AppConfig,
             for action in category.actions:
                 if dry_run:
                     print(f"[dry-run] {mail.subject!r}: {category.name} ({probability:.2f}) -> {action.type}")
-                else:
+                elif action.type != "move":
                     run_action(mailbox, mail, action)
 
         # Mark processed even when nothing matched -- otherwise a never-matching
         # email gets reclassified (and re-billed) on every future run.
         if not dry_run:
-            mailbox.mark_processed(mail.uid)
+            if moves:
+                mailbox.move(mail.uid, next(iter(moves)))
+            else:
+                mailbox.mark_processed(mail.uid)
 
 
 def _mailbox_error_message(exc: Exception, config: AppConfig) -> str:
@@ -86,7 +93,7 @@ def _run(args: argparse.Namespace, watch: bool) -> int:
     if watch:
         print(f"watching {config.mailbox.folder}@{config.mailbox.host} (ctrl-c to stop)...")
     try:
-        with Mailbox(config.mailbox) as mailbox:
+        with Mailbox(config.mailbox, readonly=args.dry_run) as mailbox:
             while True:
                 _process_unprocessed(mailbox, client, config, args.dry_run)
                 if not watch:

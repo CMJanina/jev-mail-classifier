@@ -116,7 +116,7 @@ def test_command_reports_connection_error_not_a_traceback(monkeypatch, capsys, c
     monkeypatch.setattr(cli, "get_jev_client", lambda *a, **k: MagicMock())
 
     class FakeMailbox:
-        def __init__(self, mailbox_config):
+        def __init__(self, mailbox_config, *, readonly=False):
             pass
 
         def __enter__(self):
@@ -158,3 +158,38 @@ def test_main_auto_runs_when_config_exists(monkeypatch, tmp_path):
     cli.main()
 
     assert called["cmd"] == "run"
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("destination", ["Invoices", "Other"])
+def test_move_preserves_all_tags_and_processed_flag(destination, dry_run, capsys):
+    from jev_mail.mailbox import Mailbox, PROCESSED_KEYWORD
+
+    inbox = {1: set()}
+    moved = {}
+    server = MagicMock()
+    server.add_flags.side_effect = lambda uids, flags: inbox[uids[0]].update(flags)
+    server.move.side_effect = lambda uids, folder: moved.update({folder: inbox.pop(uids[0])})
+    mailbox = Mailbox(MailboxConfig(host="example.com"), server=server)
+    mailbox.fetch_unprocessed = lambda limit: [Email(1, "Invoice", "Urgent")]
+    config = _config()
+    config.categories[0].actions.insert(0, Action("move", folder="Invoices"))
+    config.categories.append(Category("urgent", "Urgent", actions=[
+        Action("tag", value="Urgent"), Action("move", folder=destination),
+    ]))
+    client = MagicMock()
+    client.decide.return_value = {"invoice": .9, "urgent": .9}
+
+    cli._process_unprocessed(mailbox, client, config, dry_run)
+
+    if dry_run or destination != "Invoices":
+        assert inbox == {1: set()}
+        assert moved == {}
+        server.add_flags.assert_not_called()
+        server.move.assert_not_called()
+    else:
+        assert inbox == {}
+        assert moved == {"Invoices": {"Invoice", "Urgent", PROCESSED_KEYWORD}}
+        server.move.assert_called_once_with([1], "Invoices")
+    if destination != "Invoices":
+        assert "conflicting move destinations" in capsys.readouterr().out

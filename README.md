@@ -127,6 +127,11 @@ category's probability is checked against its threshold, and every action attach
 matching category runs. Processed mail is marked with a private IMAP keyword
 (`$JevProcessed`) -- no separate database to keep in sync.
 
+Tags and the processed keyword are applied before moving. If matching categories
+request different destination folders, the message is skipped without changes.
+Dry-run preserves unread status and opens the mailbox read-only, but still sends
+the subject and body to the configured API for classification.
+
 ## Config, if you'd rather skip the TUI
 
 `config.yaml` (see [`config.example.yaml`](config.example.yaml)) is plain and hand-editable:

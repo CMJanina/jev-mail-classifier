@@ -15,7 +15,7 @@ def _raw_message(subject: str, body: str) -> bytes:
 def test_fetch_unprocessed_parses_subject_and_body():
     fake_server = MagicMock()
     fake_server.search.return_value = [1]
-    fake_server.fetch.return_value = {1: {b"RFC822": _raw_message("Hello", "World")}}
+    fake_server.fetch.return_value = {1: {b"BODY[]": _raw_message("Hello", "World")}}
 
     with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server) as mailbox:
         emails = mailbox.fetch_unprocessed()
@@ -38,7 +38,7 @@ def test_fetch_unprocessed_sorts_newest_first_before_limit():
     with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server) as mailbox:
         mailbox.fetch_unprocessed(limit=2)
 
-    fake_server.fetch.assert_called_once_with([5, 4], ["RFC822"])
+    fake_server.fetch.assert_called_once_with([5, 4], ["BODY.PEEK[]"])
 
 
 def test_fetch_unprocessed_no_limit_still_sorts_newest_first():
@@ -49,7 +49,7 @@ def test_fetch_unprocessed_no_limit_still_sorts_newest_first():
     with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server) as mailbox:
         mailbox.fetch_unprocessed()
 
-    fake_server.fetch.assert_called_once_with([3, 2, 1], ["RFC822"])
+    fake_server.fetch.assert_called_once_with([3, 2, 1], ["BODY.PEEK[]"])
 
 
 def test_fetch_unprocessed_returns_empty_when_no_uids():
@@ -104,3 +104,41 @@ def test_context_manager_logs_out():
     with Mailbox(MailboxConfig(host="imap.example.com"), server=fake_server):
         pass
     fake_server.logout.assert_called_once()
+
+
+def test_dry_run_selects_readonly_and_fetches_without_marking_read(monkeypatch):
+    server = MagicMock()
+    server.search.return_value = [1]
+    server.fetch.return_value = {1: {b"BODY[]": _raw_message("Hello", "World")}}
+    monkeypatch.setattr("jev_mail.mailbox.IMAPClient", lambda *a, **kw: server)
+    with Mailbox(MailboxConfig(host="example.com"), readonly=True) as mailbox:
+        assert mailbox.fetch_unprocessed()[0].subject == "Hello"
+    server.select_folder.assert_called_once_with("INBOX", readonly=True)
+    server.fetch.assert_called_once_with([1], ["BODY.PEEK[]"])
+
+
+def test_html_fallback_and_unknown_charsets():
+    from jev_mail.mailbox import _decode_subject, _extract_body
+
+    msg = email.message.EmailMessage()
+    msg["Subject"] = "=?unknown-charset?b?SGVsbG8=?="
+    msg.set_content("<p>Invoice</p>", subtype="html")
+    msg.set_param("charset", "unknown-charset")
+    msg.make_mixed()
+    assert _decode_subject(msg) == "Hello"
+    assert "<p>Invoice</p>" in _extract_body(msg)
+    plain = email.message.EmailMessage()
+    plain.set_content("Plain invoice")
+    msg.attach(plain)
+    assert _extract_body(msg).strip() == "Plain invoice"
+
+
+def test_failed_move_removes_processed_flag():
+    import pytest
+
+    server = MagicMock()
+    server.move.side_effect = RuntimeError("move failed")
+    mailbox = Mailbox(MailboxConfig(host="example.com"), server=server)
+    with pytest.raises(RuntimeError, match="move failed"):
+        mailbox.move(1, "Invoices")
+    server.remove_flags.assert_called_once_with([1], [PROCESSED_KEYWORD])
